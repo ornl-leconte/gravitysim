@@ -23,16 +23,23 @@ int main(int argc, char ** argv) {
 
     char c;
 
-    while ((c = getopt(argc, argv, "n:v:h")) != (char)(-1)) switch (c) {
+    shader_path = "../src";
+
+    while ((c = getopt(argc, argv, "n:v:S:h")) != (char)(-1)) switch (c) {
         case 'h':
             printf("Usage: gravitysim [options]\n");
             printf("\n");
             printf("  -h                prints this help\n");
+            printf("  -v [N]            sets verbosity (5=EVERYTHING, 1=ERRORS ONLY)\n");
+            printf("  -S [dir]          shader directory\n");
             printf("\n");
             return 0;
             break;
         case 'v':
             log_set_level(atoi(optarg));
+            break;
+        case 'S':
+            shader_path = optarg;
             break;
         case 'n':
             n_particles = atoi(optarg);

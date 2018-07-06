@@ -23,8 +23,23 @@ typedef struct vec3_t {
     float x, y, z;
 } vec3_t;
 
+typedef struct mat4_t {
+    float v[4][4];
+} mat4_t;
+
+
 // quick creations
 #define V3(x, y, z) ((vec3_t){(x), (y), (z)})
+
+
+
+
+#define M4_I M4_A( \
+    1, 0, 0, 0,    \
+    0, 1, 0, 0,    \
+    0, 0, 1, 0,    \
+    0, 0, 0, 1     \
+)
 
 // unwrap (for function calls)
 #define UV3(v3) (v3).x, (v3).y, (v3).z

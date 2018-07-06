@@ -12,8 +12,18 @@ this handles rendering the scene
 #include <GL/glew.h> 
 #include <GLFW/glfw3.h>
 
+
+typedef struct program_t {
+
+    GLuint f_shader, v_shader;
+
+    GLuint program;
+
+} program_t;
+
 GLFWwindow *window;
 
+char * shader_path;
 
 void render_init();
 
