@@ -23,6 +23,10 @@ typedef struct vec3_t {
     float x, y, z;
 } vec3_t;
 
+typedef struct _vec3i_t {
+    int x, y, z;
+} vec3i_t;
+
 typedef struct mat4_t {
     float v[4][4];
 } mat4_t;

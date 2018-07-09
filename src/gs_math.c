@@ -5,19 +5,62 @@
 
 /* math/physics calculations */
 
-mat4_t perspective(float angle, float aspect, float Znear, float Zfar) {
 
-    float rads = M_PI * angle / 180.0;
+mat4_t perspective(float FOV_rads, float aspect, float Znear, float Zfar) {
 
-    float tan_hovy = tanf(rads / 2.0);
+    float top = Znear * tanf(FOV_rads / 2.0);
+    float bottom = -top;
+    float right = top * aspect;
+    float left = -right;
 
     return mat4_create(
-        1.0 / (aspect * tan_hovy), 0.0, 0.0, 0.0,
-        0.0, 1.0 / tan_hovy, 0.0, 0.0,
-        0.0, 0.0, -(Zfar+Znear)/(Zfar-Znear), -1.0,
-        0.0, 0.0, -2.0 * Zfar * Znear / (Zfar - Znear), 0.0
+        2.0 * Znear / (right - left), 0.0, (right + left) / (right - left), 0.0,
+        0.0, 2 * Znear / (top - bottom), (top + bottom) / (top - bottom), 0.0,
+        0.0, 0.0, -(Zfar+Znear)/(Zfar-Znear), -2.0 * (Zfar * Znear) / (Zfar - Znear),
+        0.0, 0.0,  -1.0, 1.0
     );
 }
+
+
+mat4_t translator(float Xoff, float Yoff, float Zoff) {
+    return mat4_create(
+             1.0,      0.0,      0.0,     Xoff,
+             0.0,      1.0,      0.0,     Yoff,
+             0.0,      0.0,      1.0,     Zoff,
+             0.0,      0.0,      0.0,     1.0
+    );
+}
+
+mat4_t rotator(float yaw, float pitch, float roll) {
+    float X = yaw, Y = pitch, Z = roll;
+    mat4_t r_x = mat4_create(
+             1.0,      0.0,      0.0,     0.0,
+             0.0,  cosf(X), -sinf(X),     0.0,
+             0.0,  sinf(X),  cosf(X),     0.0,
+             0.0,      0.0,      0.0,     1.0
+    );
+    mat4_t r_y = mat4_create(
+         cosf(Y),      0.0,  sinf(Y),     0.0,
+             0.0,      1.0,      0.0,     0.0,
+        -sinf(Y),      0.0,  cosf(Y),     0.0,
+             0.0,      0.0,      0.0,     1.0
+    );
+    mat4_t r_z = mat4_create(
+         cosf(Z), -sinf(Z),      0.0,     0.0,  
+         sinf(Z),  cosf(Z),      0.0,     0.0, 
+             0.0,      0.0,      1.0,     0.0,
+             0.0,      0.0,      0.0,     1.0
+    );
+
+    return mat4_mul(r_z, mat4_mul(r_y, r_x));
+
+}
+
+// returns radians from center
+float get_period(vec3_t point) {
+    return atan2f(point.z, point.x);
+}
+
 
 mat4_t frustrum(float l, float r, float b, float t, float n, float f) {
     mat4_t res = MAT4_0;
@@ -26,30 +69,25 @@ mat4_t frustrum(float l, float r, float b, float t, float n, float f) {
 }
 
 mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler) {
-    vec3_t f = vec3_normalized(vec3_sub(target, camera));
-    vec3_t u = vec3_normalized(camera_euler);
-    vec3_t s = vec3_normalized(vec3_cross(f, u));
-    u = vec3_cross(s, f);
+    vec3_t za = vec3_normalized(vec3_sub(camera, target));
+    vec3_t xa = vec3_normalized(vec3_cross(camera_euler, za));
+    vec3_t ya = vec3_cross(za, xa);
 
-    mat4_t res = MAT4_0;
+    mat4_t orient = mat4_create(
+        xa.x, xa.y, xa.z, 0.0,
+        ya.x, ya.y, ya.z, 0.0,
+        za.x, za.y, za.z, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
 
-    res.v[0][0] = s.x;
-    res.v[1][0] = s.y;
-    res.v[2][0] = s.z;
+    mat4_t trans = mat4_create(
+        1.0, 0.0, 0.0, -camera.x,
+        0.0, 1.0, 0.0, -camera.y,
+        0.0, 0.0, 1.0, -camera.z,
+        0.0, 0.0, 0.0, 1.0
+    );
 
-    res.v[0][1] = u.x;
-    res.v[1][1] = u.y;
-    res.v[2][1] = u.z;
-
-    res.v[0][2] = -f.x;
-    res.v[1][2] = -f.y;
-    res.v[2][2] = -f.z;
-
-    res.v[3][0] = -vec3_dot(s, camera);
-    res.v[3][1] = -vec3_dot(u, camera);
-    res.v[3][2] = vec3_dot(f, camera);
-
-    return res;
+    return mat4_mul(orient, trans);
 }
 
 mat4_t mat4_mul(mat4_t a, mat4_t b) {
@@ -83,7 +121,7 @@ mat4_t mat4_scale(mat4_t a, float b) {
 }
 
 void dump_mat4(mat4_t a) {
-    printf("[%2.2f,%2.2f,%2.2f,%2.2f]\n[%2.2f,%2.2f,%2.2f,%2.2f]\n[%2.2f,%2.2f,%2.2f,%2.2f]\n[%2.2f,%2.2f,%2.2f,%2.2f]\n",
+    printf("[%+2.2f ,%+2.2f ,%+2.2f ,%+2.2f]\n[%+2.2f ,%+2.2f ,%+2.2f ,%+2.2f]\n[%+2.2f ,%+2.2f ,%+2.2f ,%+2.2f]\n[%+2.2f ,%+2.2f ,%+2.2f ,%+2.2f]\n",
         a.v[0][0], a.v[0][1], a.v[0][2], a.v[0][3],
         a.v[1][0], a.v[1][1], a.v[1][2], a.v[1][3],
         a.v[2][0], a.v[2][1], a.v[2][2], a.v[2][3],
@@ -95,7 +133,7 @@ void dump_mat4(mat4_t a) {
 inline vec3_t vec3_cross(vec3_t a, vec3_t b) {
 
     float r_x = a.y * b.z - a.z * b.y;
-    float r_y = a.x * b.z - a.z * b.x;
+    float r_y = a.z * b.x - a.x * b.z;
     float r_z = a.x * b.y - a.y * b.x;
 
     return V3(r_x, r_y, r_z);

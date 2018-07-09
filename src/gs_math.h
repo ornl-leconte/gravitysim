@@ -18,25 +18,38 @@ math routines for gravity sim
 
 #define MAT4_0 mat4_create(0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)
 
-inline vec3_t vec3_add(vec3_t a, vec3_t b);
-inline vec3_t vec3_sub(vec3_t a, vec3_t b);
-inline float vec3_dot(vec3_t a, vec3_t b);
-inline vec3_t vec3_scale(vec3_t a, float b);
+#define MAT4_I mat4_create( \
+        1.0, 0.0, 0.0, 0.0, \
+        0.0, 1.0, 0.0, 0.0, \
+        0.0, 0.0, 1.0, 0.0, \
+        0.0, 0.0, 0.0, 1.0 \
+    );
+
+vec3_t vec3_add(vec3_t a, vec3_t b);
+vec3_t vec3_sub(vec3_t a, vec3_t b);
+float vec3_dot(vec3_t a, vec3_t b);
+vec3_t vec3_scale(vec3_t a, float b);
 
 mat4_t mat4_scale(mat4_t a, float b);
 
-mat4_t perspective(float angle, float aspect, float Znear, float Zfar);
+mat4_t perspective(float rads, float aspect, float Znear, float Zfar);
+
+mat4_t rotator(float yaw, float pitch, float roll);
+
+float get_period(vec3_t point);
+
+mat4_t translator(float Xoff, float Yoff, float Zoff);
 
 mat4_t mat4_transpose(mat4_t a);
 
 mat4_t mat4_mul(mat4_t a, mat4_t b);
 
-inline vec3_t vec3_normalized(vec3_t a) ;
+vec3_t vec3_normalized(vec3_t a) ;
 vec3_t vec3_cross(vec3_t a, vec3_t b);
 
 mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler);
 
-inline float calculate_distance_squared(vec3_t a, vec3_t b);
+float calculate_distance_squared(vec3_t a, vec3_t b);
 
 void dump_mat4(mat4_t a);
 
