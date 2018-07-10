@@ -306,7 +306,6 @@ void physics_loop_basic() {
             bool operation_happened = false;
 
             float coef = 1.0;
-/*
             if (calculate_distance(i_pos, j_pos) / 0.75 <= MASS_TO_SIZE(i_mass) + MASS_TO_SIZE(j_mass)) {
                 // collision has happened
                 col++;
@@ -369,7 +368,6 @@ void physics_loop_basic() {
                     operation_happened = true;
                 }
             }
-            */
             if (!operation_happened) {
                 float force_mag = coef * calculate_force(i_pos, i_mass, j_pos, j_mass);
                 if (force_mag > 0.0) {

@@ -428,7 +428,9 @@ bool render_update() {
     vec3_t camera_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
     update_transform_matrix(camera_pos, center_pos, V3(0.0, 0.0, 0.0));
 
-    scene.light_pos = camera_pos;
+    //scene.light_pos = camera_pos;
+
+    scene.light_pos = V3(0.0, 0.0, 0.0);
 
 
     glClearColor(0.2f, 0.0f, 0.8f, 1.0f);
