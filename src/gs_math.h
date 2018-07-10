@@ -10,6 +10,7 @@ math routines for gravity sim
 
 #include <math.h>
 
+
 #include "gravitysim.h"
 
 #define SQR(x) ((x)*(x))
@@ -24,6 +25,7 @@ math routines for gravity sim
         0.0, 0.0, 1.0, 0.0, \
         0.0, 0.0, 0.0, 1.0 \
     )
+
 
 vec3_t vec3_add(vec3_t a, vec3_t b);
 vec3_t vec3_sub(vec3_t a, vec3_t b);
@@ -43,6 +45,7 @@ float get_period(vec3_t point);
 mat4_t translator(float Xoff, float Yoff, float Zoff);
 
 mat4_t mat4_transpose(mat4_t a);
+float random_float();
 
 mat4_t mat4_mul(mat4_t a, mat4_t b);
 
@@ -50,8 +53,9 @@ vec3_t vec3_normalized(vec3_t a) ;
 vec3_t vec3_cross(vec3_t a, vec3_t b);
 
 mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler);
-
+vec3_t camera_orbit(vec3_t center, float dist, float period, float pitch);
 float calculate_distance_squared(vec3_t a, vec3_t b);
+float calculate_distance(vec3_t a, vec3_t b);
 
 void dump_mat4(mat4_t a);
 
@@ -71,6 +75,9 @@ float float_gen_default(float fa, float fr);
 // generates stuff
 
 vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float zr);
+
+
+void physics_init();
 
 // physics routines (master)
 void physics_loop_basic();

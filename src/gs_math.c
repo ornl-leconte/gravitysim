@@ -101,6 +101,16 @@ mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler) {
     return mat4_mul(orient, trans);
 }
 
+
+// period is the period in the XZ plane
+vec3_t camera_orbit(vec3_t center, float dist, float period, float pitch) {
+    vec3_t camera_pos = center;
+    camera_pos.x += dist * (cosf(pitch) * sinf(period));
+    camera_pos.y += dist * (sinf(pitch));
+    camera_pos.z += dist * (cosf(pitch) * cosf(period));
+    return camera_pos;
+}
+
 mat4_t mat4_mul(mat4_t a, mat4_t b) {
     mat4_t res;
 
@@ -219,7 +229,7 @@ inline float calculate_distance(vec3_t a, vec3_t b) {
 }
 
 float calculate_force(vec3_t a_pos, float a_mass, vec3_t b_pos, float b_mass) {
-    return gravity_coef * a_mass * b_mass / calculate_distance_squared(a_pos, b_pos);
+    return gravity_coef * a_mass * b_mass / (calculate_distance_squared(a_pos, b_pos));
 }
 
 
@@ -258,43 +268,161 @@ vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float 
 
 /* control loop */
 
-
-float last_loop_time = 0.0;
-
-
 void physics_init() {
-    last_loop_time = glfwGetTime();
 }
 
 // naive, O(n_particles^2)
 void physics_loop_basic() {
 
-
-    float cur_dt = glfwGetTime() - last_loop_time;
-
+    float cur_dt = GS_looptime;//glfwGetTime() - last_loop_time;
     int i;
+
     for (i = 0; i < n_particles; ++i) {
-        vec3_t i_pos = particle_data.positions[i];
-        float i_mass = particle_data.masses[i];
+        particle_data.forces[i] = V3(0.0, 0.0, 0.0);
+    }
+
+    physics_data.weighted_pos = V3(0.0, 0.0, 0.0);
+    physics_data.avg_pos = V3(0.0, 0.0, 0.0);
+    physics_data.std_pos = V3(0.0, 0.0, 0.0);
+
+    int col = 0;
+    int enabled = 0;
+
+    int splits = 0, joins = 0; 
+
+    for (i = 0; i < n_particles; ++i) {
+
         int j;
-        for (j = 0; j < i; ++j) {
+        for (j = n_particles - 1; j > i; --j) {
+            if (!(particle_data.is_enabled[i] && particle_data.is_enabled[j])) {
+                continue;
+            }
+        
+            vec3_t i_pos = particle_data.positions[i];
+            float i_mass = particle_data.masses[i];
             vec3_t j_pos = particle_data.positions[j];
             float j_mass = particle_data.masses[j];
+            vec3_t force_dir = vec3_sub(j_pos, i_pos);
+            bool operation_happened = false;
 
-            float force = calculate_force(i_pos, i_mass, j_pos, j_mass);
-            float cur_integral_val = cur_dt * force;
+            float coef = 1.0;
+/*
+            if (calculate_distance(i_pos, j_pos) / 0.75 <= MASS_TO_SIZE(i_mass) + MASS_TO_SIZE(j_mass)) {
+                // collision has happened
+                col++;
 
-            vec3_t ji_diff = vec3_sub(j_pos, i_pos);
-            if (vec3_normscale(ji_diff) > 0.1) {
-                vec3_t to_move = vec3_scale(ji_diff, cur_integral_val);
+                if (calculate_distance(i_pos, j_pos) / 0.56 <= MASS_TO_SIZE(i_mass) + MASS_TO_SIZE(j_mass) && (calculate_distance(particle_data.velocities[i], particle_data.velocities[i]) >= 1.0) && (MASS_TO_SIZE(i_mass) >= 2.0 || MASS_TO_SIZE(j_mass) >= 2.0) &&(n_particles - particle_data._num_enabled) >= 1) {
+                    // split them apart if this is the case
+                    splits++;
+                    int bigger_idx;
+                    float bigger_mass;
+                    vec3_t bigger_force;
+                    vec3_t bigger_position;
+                    if (MASS_TO_SIZE(i_mass) > MASS_TO_SIZE(j_mass)) {
+                        bigger_idx = i;
+                    } else {
+                        bigger_idx = j;
+                    }
+                    bigger_mass = particle_data.masses[bigger_idx];
+                    bigger_force = particle_data.forces[bigger_idx];
+                    bigger_position = particle_data.positions[bigger_idx];
 
-                particle_data.positions[i] = vec3_add(i_pos, to_move);
-                particle_data.positions[j] = vec3_sub(j_pos, to_move);
+                    int new_idx = -1;
+                    int k;
+                    for (k = 0; k < n_particles; ++k){
+                        if (!particle_data.is_enabled[k]) {
+                            new_idx = k;
+                            break;
+                        }
+                    }
+                    if (new_idx < 0) {
+                        log_error("couldn't find available particle to split");
+                    }
+
+                    particle_data.is_enabled[new_idx] = true;
+                    particle_data.masses[new_idx] = bigger_mass / 2.0;
+                    particle_data.forces[new_idx] = bigger_force;
+                    particle_data.positions[new_idx] = bigger_position;
+                    float new_size = MASS_TO_SIZE(particle_data.masses[new_idx]);
+                    particle_data.positions[new_idx] = vec3_add(particle_data.positions[new_idx], 
+                        vec3_scale(V3(0.0, 0.0, 0.0), new_size));
+                } else {
+                    joins++;
+                    // join them together
+                    float i_mass_prop = i_mass / (i_mass + j_mass);
+                    particle_data.positions[i] = vec3_add(vec3_scale(i_pos, i_mass_prop), vec3_scale(j_pos, 1.0 - i_mass_prop));
+
+                    vec3_t i_f = particle_data.forces[i], j_f = particle_data.forces[j];
+                    vec3_t n_f = V3(0.0, 0.0, 0.0);
+
+                    float j_c = j_mass / (j_mass + i_mass);
+
+                    n_f.x = 1.0 * i_f.x + j_f.x * j_c;
+                    n_f.y = 1.0 * i_f.y + j_f.y * j_c;
+                    n_f.z = 1.0 * i_f.z + j_f.z * j_c;
+
+                    particle_data.forces[i] = n_f;
+
+                    particle_data.masses[i] += j_mass;
+                    particle_data.is_enabled[j] = false;
+                    particle_data._num_enabled--;
+                    operation_happened = true;
+                }
+            }
+            */
+            if (!operation_happened) {
+                float force_mag = coef * calculate_force(i_pos, i_mass, j_pos, j_mass);
+                if (force_mag > 0.0) {
+
+                    particle_data.forces[i] = vec3_add(particle_data.forces[i], vec3_scale(force_dir, force_mag));
+                    particle_data.forces[j] = vec3_add(particle_data.forces[j], vec3_scale(force_dir, -force_mag));
+                }
             }
         }
     }
 
-    last_loop_time = glfwGetTime();
+    float sum_mass = 0.0;
+
+    for (i = 0; i < n_particles; ++i) {
+        if (particle_data.is_enabled[i]) {
+            enabled++;
+            // acceleration = foce / mass (with timestep for discrete integration)
+            vec3_t c_acc_d = vec3_scale(particle_data.forces[i], 1.0 / particle_data.masses[i]);
+
+            // integrate it
+            particle_data.velocities[i] = vec3_add(particle_data.velocities[i], vec3_scale(c_acc_d, cur_dt));
+            // update position
+            particle_data.positions[i] = vec3_add(particle_data.positions[i], vec3_scale(particle_data.velocities[i], cur_dt));
+
+            // update statistics
+            physics_data.avg_pos = vec3_add(physics_data.avg_pos, particle_data.positions[i]);
+
+            physics_data.weighted_pos = vec3_add(physics_data.weighted_pos, vec3_scale(particle_data.positions[i], particle_data.masses[i]));
+            sum_mass += particle_data.masses[i];
+
+        }
+    }
+
+    physics_data.avg_pos = vec3_scale(physics_data.avg_pos, 1.0 / enabled);
+    physics_data.weighted_pos = vec3_scale(physics_data.weighted_pos, sum_mass);
+
+    for (i = 0; i < n_particles; ++i) {
+        if (particle_data.is_enabled[i]) {
+            vec3_t cdiff = vec3_sub(particle_data.positions[i], physics_data.avg_pos);
+            cdiff.x = cdiff.x * cdiff.x;
+            cdiff.y = cdiff.y * cdiff.y;
+            cdiff.z = cdiff.z * cdiff.z;
+            physics_data.std_pos = vec3_add(physics_data.std_pos, cdiff);
+        }
+    }
+    physics_data.std_pos.x = sqrtf(physics_data.std_pos.x);
+    physics_data.std_pos.y = sqrtf(physics_data.std_pos.y);
+    physics_data.std_pos.z = sqrtf(physics_data.std_pos.z);
+    physics_data.std_pos = vec3_scale(physics_data.std_pos, 1.0 / (enabled - 1));
+
+    physics_data.splits = splits;
+    physics_data.joins = joins;
+
 }
 
 

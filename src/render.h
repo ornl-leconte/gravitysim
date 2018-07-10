@@ -16,6 +16,8 @@ GLFWwindow *window;
 
 void render_init();
 
+void control_update();
+
 bool render_update();
 
 #endif
