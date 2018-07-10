@@ -23,7 +23,7 @@ math routines for gravity sim
         0.0, 1.0, 0.0, 0.0, \
         0.0, 0.0, 1.0, 0.0, \
         0.0, 0.0, 0.0, 1.0 \
-    );
+    )
 
 vec3_t vec3_add(vec3_t a, vec3_t b);
 vec3_t vec3_sub(vec3_t a, vec3_t b);
@@ -35,6 +35,8 @@ mat4_t mat4_scale(mat4_t a, float b);
 mat4_t perspective(float rads, float aspect, float Znear, float Zfar);
 
 mat4_t rotator(float yaw, float pitch, float roll);
+
+mat4_t scaler(float X, float Y, float Z);
 
 float get_period(vec3_t point);
 
@@ -55,10 +57,7 @@ void dump_mat4(mat4_t a);
 
 // return distance between 'a' and 'b'
 inline float calculate_distance(vec3_t a, vec3_t b);
-
-// this uses the global variable 'gravity_coef'
-inline float calculate_force(total_particle_state_t a, total_particle_state_t b);
-
+inline float vec3_normscale(vec3_t a);
 
 mat4_t mat4_create(
     float v00, float v01, float v02, float v03,
@@ -67,9 +66,15 @@ mat4_t mat4_create(
     float v30, float v31, float v32, float v33
 );
 
+
+float float_gen_default(float fa, float fr);
 // generates stuff
 
-total_particle_state_t generate_state_default(float avg_mass, float mass_range, vec3_t center, vec3_t center_range, vec3_t avg_velocity, vec3_t velocity_range);
+vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float zr);
+
+// physics routines (master)
+void physics_loop_basic();
+
 
 #endif
 

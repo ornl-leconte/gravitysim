@@ -15,3 +15,4 @@ void main() {
     frag_pos = vec3(uni_model_tr * vec4(in_vertex, 1.0));
     normal = in_normal;
 }
+

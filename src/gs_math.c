@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "ccgl_gl.h"
+
 /* math/physics calculations */
 
 
@@ -18,6 +20,15 @@ mat4_t perspective(float FOV_rads, float aspect, float Znear, float Zfar) {
         0.0, 2 * Znear / (top - bottom), (top + bottom) / (top - bottom), 0.0,
         0.0, 0.0, -(Zfar+Znear)/(Zfar-Znear), -2.0 * (Zfar * Znear) / (Zfar - Znear),
         0.0, 0.0,  -1.0, 1.0
+    );
+}
+
+mat4_t scaler(float X, float Y, float Z) {
+    return mat4_create(
+             X,      0.0,      0.0,     0.0,
+             0.0,      Y,      0.0,     0.0,
+             0.0,      0.0,      Z,     0.0,
+             0.0,      0.0,      0.0,     1.0
     );
 }
 
@@ -192,7 +203,11 @@ inline vec3_t vec3_scale(vec3_t a, float b) {
 }
 
 inline vec3_t vec3_normalized(vec3_t a) {
-    return vec3_scale(a, 1.0 / sqrt(a.x*a.x+a.y*a.y+a.z*a.z));
+    return vec3_scale(a, vec3_normscale(a));
+}
+
+inline float vec3_normscale(vec3_t a) {
+    return 1.0 / sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
 }
 
 inline float calculate_distance_squared(vec3_t a, vec3_t b) {
@@ -203,9 +218,10 @@ inline float calculate_distance(vec3_t a, vec3_t b) {
     return SQRT(calculate_distance_squared(a, b));
 }
 
-inline float calculate_force(total_particle_state_t a, total_particle_state_t b) {
-    return (gravity_coef * a.mass * b.mass) / calculate_distance_squared(a.position, b.position);
+float calculate_force(vec3_t a_pos, float a_mass, vec3_t b_pos, float b_mass) {
+    return gravity_coef * a_mass * b_mass / calculate_distance_squared(a_pos, b_pos);
 }
+
 
 
 /* generative functions */
@@ -217,6 +233,7 @@ float random_float() {
 }
 
 
+
 /*
 
 
@@ -226,23 +243,58 @@ They exist within the rectangular prism
 
 */
 
-total_particle_state_t generate_state_default(float avg_mass, float mass_range, vec3_t center, vec3_t center_range, vec3_t avg_velocity, vec3_t velocity_range) {
-    vec3_t new_pos = center;
-    new_pos.x += (random_float() - 0.5) * center_range.x;
-    new_pos.y += (random_float() - 0.5) * center_range.y;
-    new_pos.z += (random_float() - 0.5) * center_range.z;
-    float new_mass = avg_mass + (random_float() - 0.5) * mass_range;
-    vec3_t new_vel = avg_velocity;
-    new_vel.x += (random_float() - 0.5) * velocity_range.x;
-    new_vel.y += (random_float() - 0.5) * velocity_range.y;
-    new_vel.z += (random_float() - 0.5) * velocity_range.z;
+float float_gen_default(float fa, float fr) {
+    return fa + (random_float() - 0.5) * fr;
+}
 
-    total_particle_state_t res;
-    res.mass = new_mass;
-    res.position = new_pos;
-    res.velocity = new_vel;
-
+vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float zr) {
+    vec3_t res;
+    res.x = float_gen_default(xa, xr);
+    res.y = float_gen_default(ya, yr);
+    res.z = float_gen_default(za, zr);
     return res;
+}
+
+
+/* control loop */
+
+
+float last_loop_time = 0.0;
+
+
+void physics_init() {
+    last_loop_time = glfwGetTime();
+}
+
+// naive, O(n_particles^2)
+void physics_loop_basic() {
+
+
+    float cur_dt = glfwGetTime() - last_loop_time;
+
+    int i;
+    for (i = 0; i < n_particles; ++i) {
+        vec3_t i_pos = particle_data.positions[i];
+        float i_mass = particle_data.masses[i];
+        int j;
+        for (j = 0; j < i; ++j) {
+            vec3_t j_pos = particle_data.positions[j];
+            float j_mass = particle_data.masses[j];
+
+            float force = calculate_force(i_pos, i_mass, j_pos, j_mass);
+            float cur_integral_val = cur_dt * force;
+
+            vec3_t ji_diff = vec3_sub(j_pos, i_pos);
+            if (vec3_normscale(ji_diff) > 0.1) {
+                vec3_t to_move = vec3_scale(ji_diff, cur_integral_val);
+
+                particle_data.positions[i] = vec3_add(i_pos, to_move);
+                particle_data.positions[j] = vec3_sub(j_pos, to_move);
+            }
+        }
+    }
+
+    last_loop_time = glfwGetTime();
 }
 
 

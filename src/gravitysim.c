@@ -4,17 +4,18 @@
 
 #include "gs_math.h"
 #include "render.h"
+#include "ccgl_gl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <getopt.h>
 
 float gravity_coef = 9.81;
 
 // global particles array
-int n_particles = 0;
-total_particle_state_t * particles = NULL;
+int n_particles = 10;
 
 
 int main(int argc, char ** argv) {
@@ -22,8 +23,6 @@ int main(int argc, char ** argv) {
     log_set_level(LOG_INFO);
 
     char c;
-
-    shader_path = "../src";
 
     while ((c = getopt(argc, argv, "n:v:S:h")) != (char)(-1)) switch (c) {
         case 'h':
@@ -39,7 +38,7 @@ int main(int argc, char ** argv) {
             log_set_level(atoi(optarg));
             break;
         case 'S':
-            shader_path = optarg;
+            add_shader_path(optarg);
             break;
         case 'n':
             n_particles = atoi(optarg);
@@ -60,18 +59,34 @@ int main(int argc, char ** argv) {
     
     log_info("number of particles: %d", n_particles);
 
-    particles = (total_particle_state_t *)malloc(sizeof(total_particle_state_t) * n_particles);
+
+    particle_data.positions = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
+    particle_data.velocities = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
+    particle_data.masses = (float *)malloc(sizeof(float) * n_particles);
 
     int i;
 
     for (i = 0; i < n_particles; ++i) {
-        particles[i] = generate_state_default(8.0, 2.0, V3(0.0, 0.0, 0.0), V3(1.0, 1.0, 1.0), V3(0.0, 0.0, 0.0), V3(0.0, 0.0, 0.0));
+        particle_data.positions[i] = vec3_gen_default(0.0, 10.0, 0.0, 10.0, 0.0, 10.0);
+        particle_data.velocities[i] = V3(0.0, 0.0, 0.0);
+        particle_data.masses[i] = float_gen_default(1.0, 0.5);
     }
+
+    physics_init();
 
     render_init();
 
+    bool keep_going = true;
 
-    while (render_update());
+    float st = glfwGetTime(), et = glfwGetTime();
+
+    while (keep_going) {
+        st = et;
+        physics_loop_basic();
+        keep_going = render_update();
+        et = glfwGetTime();
+        log_trace("total time: %f ms (%f fps)", (et - st) / 1000.0, 1.0 / (et - st));
+    }
 
     return 0;
 }
