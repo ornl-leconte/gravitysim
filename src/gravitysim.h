@@ -10,11 +10,10 @@ gravitysim - 3D N body simulation
 #define __GRAVITYSIM_H__
 
 #include "gravitysimconfig.h"
-
 #include "log.h"
 
 #include "ccgl.h"
-
+#include "controls.h"
 #include "gs_math.h"
 
 #include <stdbool.h>
@@ -27,6 +26,11 @@ typedef struct _vec3i_t {
     int x, y, z;
 } vec3i_t;
 
+typedef struct _particle_t {
+    float x, y, z, mass;
+} particle_t;
+
+
 float gravity_coef;
 
 int n_particles;
@@ -35,13 +39,12 @@ int n_particles;
 
 struct {
 
-    vec3_t * positions;
+    particle_t * P;
 
+    // use packed stuff
     vec3_t * velocities;
 
     vec3_t * forces;
-
-    float * masses;
 
     bool * is_enabled;
 
@@ -54,8 +57,6 @@ struct {
     vec3_t weighted_pos;
 
     vec3_t avg_pos, std_pos;
-
-    int splits, joins;
 
 } physics_data;
 

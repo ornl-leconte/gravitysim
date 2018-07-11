@@ -1,5 +1,5 @@
 
-add_executable(gravitysim gravitysim.c log.c gs_math.c render.c render_vals.c gravitysim.h log.h gs_math.h render.h render_vals.h)
+add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c render.c render_vals.c gravitysim.h log.h gs_math.h gs_physics.h render.h render_vals.h controls.h phys/naive.c phys/naive_parallel.c)
 
 
 add_library(ccgl ccgl.c ccgl_gl.c ccgl.h ccgl_gl.h)

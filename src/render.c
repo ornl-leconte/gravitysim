@@ -45,8 +45,6 @@ struct {
 
 
 
-GLuint vao;
-
 
 // all shader programs
 struct {
@@ -60,15 +58,6 @@ struct {
 } shaders;
 
 
-// misc buffers
-struct {
-
-    GLuint inst_pos;
-    GLuint inst_mass;
-
-} mbufs;
-
-
 // updated every loop to use as matrix operations to transform
 struct {
 
@@ -78,16 +67,13 @@ struct {
 
 } transformations;
 
-
 struct {
 
-    vec3_t light_pos;
+    GLuint vbo;
 
-    mat4_t floor_model;
+    particle_t * buf;
 
-    float cam_dist, cam_period, cam_pitch, cam_fov;
-
-} scene;
+} particles;
 
 
 // error handling
@@ -106,8 +92,8 @@ void error_callback(int error, const char* description) {
     }
 }
 
-// initialization
-bool * is_pressed_state;
+//GLuint vao;
+
 
 void render_init() {
 
@@ -128,12 +114,26 @@ void render_init() {
 
 #endif
 
-    // it's important to create a window BEFORE intiailizing glew or anything
-    window = glfwCreateWindow(win_width, win_height, "gravitysim", NULL, NULL);
+    bool fullscreen = win_width == 0 || win_height == 0;
+    if (fullscreen) {
+        const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+
+        window = glfwCreateWindow(mode->width, mode->height, "gravitysim", glfwGetPrimaryMonitor(), NULL);
+
+    } else {
+        // it's important to create a window BEFORE intiailizing glew or anything
+        window = glfwCreateWindow(win_width, win_height, "gravitysim", NULL, NULL);
+    }
+
 
     glfwMakeContextCurrent(window);
-    
 
+    glfwGetWindowSize(window, &win_width, &win_height);
+    glfwGetFramebufferSize(window, &vp_width, &vp_height);
 
     if (window == NULL) {
         printf("GLFW failed to create a window\n");
@@ -148,6 +148,7 @@ void render_init() {
         exit(1);                      
     }
 
+    glViewport(0, 0, vp_width, vp_height);
 
     log_info("OpenGL version: %s", glGetString(GL_VERSION));
 
@@ -160,10 +161,10 @@ void render_init() {
 
     scene.cam_period = 0.0;
     scene.cam_pitch = M_PI / 4.0;
-    scene.cam_dist = 100.0;
+    scene.cam_dist = 250.0;
     scene.cam_fov = M_PI / 4.0;
-    
 
+    particles.buf = (particle_t *)malloc(sizeof(particle_t) * n_particles);
     
 
     /* basic opengl settings */
@@ -177,29 +178,19 @@ void render_init() {
     // might need to transpose
     //dump_mat4(view);
 
-
-
-    /* model creation */
-
+/*
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
+*/
+    /* model creation */
 
-    glGenBuffers(1, &mbufs.inst_pos);
-    glBindBuffer(GL_ARRAY_BUFFER, mbufs.inst_pos);
-    glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(float) * MAX_NUM_PARTICLES, NULL, GL_STREAM_DRAW);
-
-
-    glGenBuffers(1, &mbufs.inst_mass);
-    glBindBuffer(GL_ARRAY_BUFFER, mbufs.inst_mass);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * MAX_NUM_PARTICLES, NULL, GL_STREAM_DRAW);
-
-
+    glGenBuffers(1, &particles.vbo);
 
     /* load objects */
 
-    prefabs.ico = load_obj("../models/ico.obj", 1.0);
-    prefabs.cade = load_obj("../models/cade.obj", 1.0);
-    prefabs.plane = load_obj("../models/plane.obj", 1.0);
+    prefabs.ico = load_obj("../models/ico.obj");
+    prefabs.cade = load_obj("../models/cade.obj");
+    prefabs.plane = load_obj("../models/plane.obj");
 
     /* load shaders */
 
@@ -209,14 +200,6 @@ void render_init() {
     shaders.basic = load_shader("basic.v.shader", "basic.f.shader").program;
     shaders.instanced = load_shader("instanced.v.shader", "instanced.f.shader").program;
     shaders.plane = load_shader("plane.v.shader", "plane.f.shader").program;
-
-    is_pressed_state = malloc(sizeof(bool) *  (GLFW_KEY_LAST + 1));
-
-    int i;
-    for (i = 0; i < GLFW_KEY_LAST + 1; ++i) {
-        is_pressed_state[i] = GLFW_RELEASE;
-    }
-
 
     GLCHK
 
@@ -251,6 +234,8 @@ void update_transform_matrix(vec3_t camera_pos, vec3_t towards, vec3_t rot) {
 }
 
 void render_model(model_t model) {
+    glBindVertexArray(model.vao);
+
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, model.vbo);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
@@ -303,10 +288,65 @@ void _basic_render() {
 
     /* render models */
     render_model(prefabs.cade);
-    render_model(prefabs.ico);
+    //render_model(prefabs.ico);
 }
 
+void render_particles() {
 
+    glUseProgram(shaders.instanced);
+
+    int model_tr = glGetUniformLocation(shaders.instanced, "u_model_tr");
+    int viewproj_tr = glGetUniformLocation(shaders.instanced, "u_viewproj_tr");
+
+    int lightpos = glGetUniformLocation(shaders.instanced, "u_lightpos");
+
+    if (!(model_tr >= 0 && viewproj_tr >= 0 && lightpos >= 0)) {
+        printf("error finding transformation shader positions (%d,%d,%d)\n", model_tr, viewproj_tr, lightpos);
+        exit(1);
+    }
+
+    glUniformMatrix4fv(model_tr, 1, GL_TRUE, &(transformations.model.v[0][0]));
+    glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
+    glUniform3f(lightpos, scene.light_pos.x, scene.light_pos.y, scene.light_pos.z);
+
+    model_t model = prefabs.ico;
+
+    glBindVertexArray(model.vao);
+
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, model.vbo);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, model.nbo);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+
+    int i;
+    int enabled = 0;
+    for (i = 0; i < n_particles; ++i) {
+        if (particle_data.is_enabled[i]) {
+            particles.buf[i] = particle_data.P[i];
+            enabled++;
+        }
+    }
+
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, particles.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(particle_t) * enabled, particles.buf, GL_STREAM_DRAW);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribDivisor(2, 1);
+
+
+
+    /* instancing */
+
+    glDrawArraysInstanced(GL_TRIANGLES, 0, model.nbo_num, enabled);
+
+}
+/*
 void _inst_render() {
 
     glUseProgram(shaders.instanced);
@@ -359,47 +399,7 @@ void _inst_render() {
     //log_trace("num instances: %d", c);
 
 }
-
-
-bool pressed_once(int k) {
-    bool res = (glfwGetKey(window, k) == GLFW_PRESS) && (is_pressed_state[k] != GLFW_PRESS);
-    is_pressed_state[k] = glfwGetKey(window, k);
-    return res;
-}
-
-bool is_pressed(int k) {
-    is_pressed_state[k] = glfwGetKey(window, k);
-    return glfwGetKey(window, k) == GLFW_PRESS;
-}
-
-
-void control_update() {
-    // will be 1.0 at perfect 60.0 fps
-    float cm = GS_looptime * 60.0;
-    glfwSetInputMode(window, GLFW_STICKY_KEYS, 1);
-
-    // do update for all sorts of controllers 
-    if (is_pressed(GLFW_KEY_D)) scene.cam_period += (cm / 60.0) * (0.666 * M_PI);
-    if (is_pressed(GLFW_KEY_A)) scene.cam_period -= (cm / 60.0) * (0.666 * M_PI);
-    if (is_pressed(GLFW_KEY_W)) scene.cam_pitch += (cm / 60.0) * (0.666 * M_PI);
-    if (is_pressed(GLFW_KEY_S)) scene.cam_pitch -= (cm / 60.0) * (0.666 * M_PI);
-    if (is_pressed(GLFW_KEY_SPACE)) scene.cam_dist /= expf(0.5 * (cm / 60.0));
-    if (is_pressed(GLFW_KEY_LEFT_SHIFT) || is_pressed(GLFW_KEY_RIGHT_SHIFT)) scene.cam_dist *= expf(0.5 * (cm / 60.0));
-
-    if (is_pressed(GLFW_KEY_PERIOD)) scene.cam_fov += M_PI * 0.15 * (cm / 60.0);
-    if (is_pressed(GLFW_KEY_COMMA)) scene.cam_fov -= M_PI * 0.15 * (cm / 60.0);
-
-    if (pressed_once(GLFW_KEY_P)) sim_data.is_paused = !sim_data.is_paused;
-
-
-    if (scene.cam_pitch > M_PI / 2) scene.cam_pitch = M_PI / 2 - 0.01;
-    if (scene.cam_pitch < - M_PI / 2) scene.cam_pitch = - M_PI / 2 + 0.01;
-
-    if (scene.cam_fov > M_PI) scene.cam_fov = M_PI - 0.01;
-    if (scene.cam_fov < 0.0) scene.cam_fov = 0.01;
-
-
-}
+*/
 
 
 bool render_update() {
@@ -423,14 +423,14 @@ bool render_update() {
 
 
     scene.floor_model = mat4_mul(translator(0.0, -100.0, 0.0), scaler(100.0, 100.0, 100.0));
-    vec3_t center_pos = V3(0.0, -10, 0.0);
+    vec3_t center_pos = V3(0.0, 0.0, 0.0);
 
     vec3_t camera_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
     update_transform_matrix(camera_pos, center_pos, V3(0.0, 0.0, 0.0));
 
-    //scene.light_pos = camera_pos;
+    scene.light_pos = camera_pos;
 
-    scene.light_pos = V3(0.0, 0.0, 0.0);
+   // scene.light_pos = V3(0.0, 0.0, 0.0);
 
 
     glClearColor(0.2f, 0.0f, 0.8f, 1.0f);
@@ -441,9 +441,14 @@ bool render_update() {
 
     /* draw the stuff */
 
+    
+
     _floor_render();
     //_basic_render();
-    _inst_render();
+    //_inst_render();
+    
+    render_particles();
+    //render_model(prefabs.ico);
 
     
     /* boiler plate stuff */

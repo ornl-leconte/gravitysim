@@ -1,18 +1,18 @@
 #version 330 core
 
-uniform vec3 uni_lightpos;
+uniform vec3 u_lightpos;
 
-in vec3 normal;
-in vec3 frag_pos;
-in float instance_id;
-out vec3 color;
+in vec3 f_normal;
+in vec3 f_fragpos;
 
+flat in int f_instanceid;
+
+out vec3 f_color;
 
 void main(){
-  vec3 norm = normalize(normal);
-  vec3 light_dir = normalize(uni_lightpos - frag_pos);
+  vec3 norm = normalize(f_normal);
+  vec3 light_dir = normalize(u_lightpos - f_fragpos);
+
   float diff = max(dot(norm, light_dir), 0.0);
-  vec3 diffuse = diff * vec3(1.0, instance_id / 2048.0, 0.0);
-  color = diffuse;
-  //color = vec3(1.0, 1.0, 1.0);
+  f_color = diff * vec3(1.0, 0.0, 0.0);
 }

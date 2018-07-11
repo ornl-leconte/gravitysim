@@ -3,6 +3,7 @@
 #include "gravitysim.h"
 
 #include "gs_math.h"
+#include "gs_physics.h"
 #include "render.h"
 #include "ccgl_gl.h"
 
@@ -31,12 +32,12 @@ void spawn_cluster(vec3_t center, float rad, float mass, int n) {
         float pitch = M_PI * (random_float() - 0.5);
         float trad = rad * random_float();
 
-        vec3_t pos;
-        pos.x = trad * cosf(pitch) * cosf(y_rot);
-        pos.y = trad * sinf(pitch);
-        pos.z = trad * cosf(pitch) * sinf(y_rot);
-        particle_data.positions[i_p] = pos;
-        particle_data.masses[i_p] = mass;
+        particle_t part;
+        part.x = trad * cosf(pitch) * cosf(y_rot);
+        part.y = trad * sinf(pitch);
+        part.z = trad * cosf(pitch) * sinf(y_rot);
+        part.mass = mass;
+        particle_data.P[i_p] = part;
         particle_data.forces[i_p] = V3(0.0, 0.0, 0.0);
         particle_data.velocities[i_p] = V3(0.0, 0.0, 0.0);
         particle_data.is_enabled[i_p] = true;
@@ -51,13 +52,14 @@ int main(int argc, char ** argv) {
 
     char c;
 
-    while ((c = getopt(argc, argv, "n:v:S:G:h")) != (char)(-1)) switch (c) {
+    while ((c = getopt(argc, argv, "n:v:S:w:G:h")) != (char)(-1)) switch (c) {
         case 'h':
             printf("Usage: gravitysim [options]\n");
             printf("\n");
             printf("  -h                prints this help\n");
             printf("  -v [N]            sets verbosity (5=EVERYTHING, 1=ERRORS ONLY)\n");
             printf("  -S [dir]          shader directory\n");
+            printf("  -w [WxH]          width and height of window (0 for either for fullscreen)\n");
             printf("  -G [f]            gravity constant\n");
             printf("\n");
             return 0;
@@ -67,6 +69,9 @@ int main(int argc, char ** argv) {
             break;
         case 'S':
             add_shader_path(optarg);
+            break;
+        case 'w':
+            sscanf(optarg, "%dx%d", &win_width, &win_height);
             break;
         case 'n':
             n_particles = atoi(optarg);
@@ -91,13 +96,12 @@ int main(int argc, char ** argv) {
     log_info("number of particles: %d", n_particles);
 
 
-    particle_data.positions = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
+    particle_data.P = (particle_t *)malloc(sizeof(particle_t) * n_particles);
     particle_data.velocities = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
     particle_data.forces = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
-    particle_data.masses = (float *)malloc(sizeof(float) * n_particles);
     particle_data.is_enabled = (bool *)malloc(sizeof(bool) * n_particles);
 
-    spawn_cluster(V3(0.0, 0.0, 0.0), 100, 1.0, n_particles);
+    spawn_cluster(V3(0.0, 0.0, 0.0), 100.0, 1.0, n_particles);
 /*
     int i;
 
@@ -120,7 +124,10 @@ int main(int argc, char ** argv) {
 
     physics_init();
 
+    control_init();
+
     render_init();
+
 
     bool keep_going = true;
 
@@ -131,19 +138,25 @@ int main(int argc, char ** argv) {
         float ph_st = glfwGetTime(), ph_et;
 
         if (!sim_data.is_paused) {
-            physics_loop_basic();
-            int i;
-            for (i = 0; i < n_particles; ++i) {
-                if (particle_data.is_enabled[i]) {
-                    particle_data.positions[i] = vec3_sub(particle_data.positions[i], physics_data.avg_pos);
-                    if (particle_data.positions[i].x > 100.0) particle_data.positions[i].x = 100.0;
-                    if (particle_data.positions[i].y > 100.0) particle_data.positions[i].y = 100.0;
-                    if (particle_data.positions[i].z > 100.0) particle_data.positions[i].z = 100.0;
-                    if (particle_data.positions[i].x < -100.0) particle_data.positions[i].x = -100.0;
-                    if (particle_data.positions[i].y < -100.0) particle_data.positions[i].y = -100.0;
-                    if (particle_data.positions[i].z < -100.0) particle_data.positions[i].z = -100.0;
-                }
-            }
+            
+            //physics_loop_no_collision();
+            //physics_loop_naive();
+            physics_loop_naive_parallel();
+            
+            
+            float up_st = glfwGetTime(), up_et;
+
+            physics_update_positions();
+            //physics_update_statistics();
+
+            // keep them in a box
+            physics_clamp_positions();
+
+            up_et = glfwGetTime();
+
+/*
+
+            */
         }
 
         ph_et = glfwGetTime();
@@ -153,24 +166,18 @@ int main(int argc, char ** argv) {
             if (particle_data.is_enabled[i]) particle_data._num_enabled++;
         }
 
-        float rn_st = glfwGetTime(), rn_et;
+        float rn_st = glfwGetTime(), rn_et;        
         keep_going = render_update();
         rn_et = glfwGetTime();
 
         GS_looptime = rn_et + ph_et - rn_st - ph_st;
 
         if (log_get_level() >= LOG_DEBUG) {
-            printf("loop time: %3.2f ms", 1000.0 * (rn_et + ph_et - rn_st - ph_st));
+            printf("loop time: %3.2f ms, phys time %3.2f ms", 1000.0 * (rn_et + ph_et - rn_st - ph_st), 1000.0 * (ph_et - ph_st));
         }
 
         if (log_get_level() >= LOG_TRACE) {
             printf(", instances: %d", particle_data._num_enabled);
-            if (physics_data.splits > 0) {
-                printf(", splits: %d", physics_data.splits);
-            }
-            if (physics_data.joins > 0) {
-                printf(", joins: %d", physics_data.joins);
-            }
             printf(", avg_pos: %f,%f,%f", physics_data.avg_pos.x, physics_data.avg_pos.y, physics_data.avg_pos.z);
         }
 

@@ -158,7 +158,7 @@ typedef struct _i3_t {
 
 } i3_t;
 
-model_t load_obj(char * obj_path, float scale) {
+model_t load_obj(char * obj_path) {
 
     model_t res;
 
@@ -192,13 +192,13 @@ model_t load_obj(char * obj_path, float scale) {
             vec3_t vertex;
             fscanf(fp, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
             read_verts_num++;
-            read_verts = (vec3_t *)realloc(read_verts, sizeof(i3_t) * read_verts_num);
+            read_verts = (vec3_t *)realloc(read_verts, sizeof(vec3_t) * read_verts_num);
             read_verts[read_verts_num - 1] = vertex;
         } else if ( strcmp( lineHeader, "vn" ) == 0 ){
             vec3_t normal;
             fscanf(fp, "%f %f %f\n", &normal.x, &normal.y, &normal.z );
             read_normals_num++;
-            read_normals = (vec3_t *)realloc(read_normals, sizeof(i3_t) * read_normals_num);
+            read_normals = (vec3_t *)realloc(read_normals, sizeof(vec3_t) * read_normals_num);
             read_normals[read_normals_num - 1] = normal;
         } else if (strcmp(lineHeader, "f") == 0) {
             i3_t fv, fuv, fn;
@@ -253,37 +253,36 @@ model_t load_obj(char * obj_path, float scale) {
 
     int i;
     for (i = 0; i < f_num; i++) {
-        vec3_t cv_0 = read_verts[f_verts[i].x-1];
-        vec3_t cv_1 = read_verts[f_verts[i].y-1];
-        vec3_t cv_2 = read_verts[f_verts[i].z-1];
+        out_verts[3 * i + 0] = read_verts[f_verts[i].x-1];
+        out_verts[3 * i + 1] = read_verts[f_verts[i].y-1];
+        out_verts[3 * i + 2] = read_verts[f_verts[i].z-1];
 
-        out_verts[3 * i + 0] = vec3_scale(cv_0, scale);
-        out_verts[3 * i + 1] = vec3_scale(cv_1, scale);
-        out_verts[3 * i + 2] = vec3_scale(cv_2, scale);
-
-        vec3_t cn_0 = read_normals[f_normals[i].x-1];
-        vec3_t cn_1 = read_normals[f_normals[i].y-1];
-        vec3_t cn_2 = read_normals[f_normals[i].z-1];
-
-        out_normals[3 * i + 0] = cn_0;
-        out_normals[3 * i + 1] = cn_1;
-        out_normals[3 * i + 2] = cn_2;
+        out_normals[3 * i + 0] = read_normals[f_normals[i].x-1];
+        out_normals[3 * i + 1] = read_normals[f_normals[i].y-1];
+        out_normals[3 * i + 2] = read_normals[f_normals[i].z-1];
     }
 
-    res.vbo_num = f_num * 9;
-    res.nbo_num = f_num * 9;
+    res.vbo_num = f_num * 3;
+    res.nbo_num = f_num * 3;
 
     //res.vbo_num = read_verts_num * 3;
     //res.nbo_num = read_normals_num * 3;
 
+    glGenVertexArrays(1, &res.vao);
+    glBindVertexArray(res.vao);
+
     glGenBuffers(1, &res.vbo);
     glBindBuffer(GL_ARRAY_BUFFER, res.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * res.vbo_num, out_verts, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3_t) * res.vbo_num, out_verts, GL_STATIC_DRAW);
 
     glGenBuffers(1, &res.nbo);
     glBindBuffer(GL_ARRAY_BUFFER, res.nbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * res.nbo_num, out_normals, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3_t) * res.nbo_num, out_normals, GL_STATIC_DRAW);
 
+    if (res.nbo_num != res.vbo_num) {
+        printf("while loading model '%s', vbo_num and nbo_num are different!\n");
+        exit(1);
+    }
 
     free(read_verts);
     free(read_normals);

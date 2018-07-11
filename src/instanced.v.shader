@@ -1,26 +1,30 @@
-#version 330
+#version 330 core
 
-#define MAX_PARTICLES 2048
+layout(location = 0) in vec3 v_vertex;
+layout(location = 1) in vec3 v_normal;
+// packed x, y, z, mass
+layout(location = 2) in vec4 v_particle;
 
-layout(location = 0) in vec3 in_vertex;
-layout(location = 1) in vec3 in_normal;
+out vec3 f_normal;
+out vec3 f_fragpos;
 
-out vec3 frag_pos;
-out vec3 normal;
-out float instance_id;
+out vec3 f_lightpos;
+flat out int f_instanceid;
 
-uniform mat4 uni_model_tr;
-uniform mat4 uni_viewproj_tr;
+uniform mat4 u_model_tr;
+uniform mat4 u_viewproj_tr;
 
-uniform vec3 uni_particle_offests[MAX_PARTICLES];
-uniform float uni_particle_mass[MAX_PARTICLES];
 
 void main() {
-    float size = pow(uni_particle_mass[gl_InstanceID], 1.0 / 3.0);
-    vec3 adj_pos = in_vertex * size + uni_particle_offests[gl_InstanceID];
-    gl_Position = uni_viewproj_tr * uni_model_tr * vec4(adj_pos, 1.0);
-    frag_pos = vec3(uni_model_tr * vec4(adj_pos, 1.0));
-    normal = in_normal;
-    instance_id = gl_InstanceID;
+    float size = pow(v_particle.w, 1.0 / 3.0);
+   // float size = 1.0;
+    vec4 adj_pos = vec4(v_vertex * size + v_particle.xyz, 1.0);
+
+    gl_Position = u_viewproj_tr * u_model_tr * adj_pos;
+
+    f_normal = v_normal;
+    f_fragpos = vec3(u_model_tr * adj_pos);
+    
+    f_instanceid = gl_InstanceID;
 }
 

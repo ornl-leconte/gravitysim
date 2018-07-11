@@ -60,8 +60,8 @@ float calculate_distance(vec3_t a, vec3_t b);
 void dump_mat4(mat4_t a);
 
 // return distance between 'a' and 'b'
-inline float calculate_distance(vec3_t a, vec3_t b);
-inline float vec3_normscale(vec3_t a);
+float calculate_distance(vec3_t a, vec3_t b);
+float vec3_normscale(vec3_t a);
 
 mat4_t mat4_create(
     float v00, float v01, float v02, float v03,
@@ -76,11 +76,6 @@ float float_gen_default(float fa, float fr);
 
 vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float zr);
 
-
-void physics_init();
-
-// physics routines (master)
-void physics_loop_basic();
 
 
 #endif

@@ -12,6 +12,7 @@ void main(){
   vec3 light_dir = normalize(uni_lightpos - frag_pos);
   float diff = max(dot(norm, light_dir), 0.0);
   vec3 diffuse = diff * vec3(1.0, 1.0, 0.0);
-  color = diffuse;
-  //color = vec3(1.0, 1.0, 1.0);
+  
+  //color = diffuse;
+  color = vec3(1.0, 0.0, 0.0);
 }

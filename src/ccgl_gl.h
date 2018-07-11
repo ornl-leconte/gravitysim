@@ -26,14 +26,14 @@ typedef struct _shader_t {
 
 typedef struct _model_t {
 
-    int vbo, nbo;
+    int vbo, vao, nbo;
 
     int vbo_num, nbo_num;
 
 } model_t;
 
 
-model_t load_obj(char * obj_path, float scale);
+model_t load_obj(char * obj_path);
 
 
 static struct {
