@@ -13,7 +13,7 @@ add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c r
 
 
 
-target_link_libraries(gravitysim m  ${CMAKE_DL_LIBS} ${GLEW_LIBRARIES} glfw ${OPENGL_LIBRARIES} ${extra_libs})
+target_link_libraries(gravitysim m  ${CMAKE_DL_LIBS} ${GLEW_LIBRARIES} glfw pthread ${OPENGL_LIBRARIES} ${extra_libs})
 
 
 install (FILES gravitysim.h DESTINATION include)

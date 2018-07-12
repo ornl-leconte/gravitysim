@@ -119,7 +119,7 @@ void error_callback(int error, const char* description) {
 void render_init() {
 
     // initializing glfw
-    if (glfwInit() != GLFW_TRUE) {                                                  
+    if (glfwInit() != 1) {                                                  
         printf("Glfw failed to init\n");     
         exit(1);                           
     }

@@ -15,8 +15,12 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 
 
-find_package(OpenCL)
+option(WITH_OPENCL "Build with OpenCL" ON)
 
+
+if (WITH_OPENCL)
+find_package(OpenCL)
+endif()
 
 set (CMAKE_C_FLAGS "-O3 -ffast-math -g -Wall -pedantic -std=c99 ${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
