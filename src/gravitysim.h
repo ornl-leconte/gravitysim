@@ -17,6 +17,8 @@ gravitysim - 3D N body simulation
 #include "gs_math.h"
 
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 
 // maximum number of particles in a simulation
@@ -26,9 +28,9 @@ typedef struct _vec3i_t {
     int x, y, z;
 } vec3i_t;
 
-typedef struct _particle_t {
-    float x, y, z, mass;
-} particle_t;
+
+// this is used for all sorts of things. For example 'shared_data_dir'/src/phys can get you kernels, etc
+char * shared_data_dir;
 
 
 float gravity_coef;
@@ -39,12 +41,12 @@ int n_particles;
 
 struct {
 
-    particle_t * P;
+    vec4_t * P;
 
     // use packed stuff
-    vec3_t * velocities;
+    vec4_t * velocities;
 
-    vec3_t * forces;
+    vec4_t * forces;
 
     bool * is_enabled;
 
@@ -52,13 +54,6 @@ struct {
 
 } particle_data;
 
-struct {
-
-    vec3_t weighted_pos;
-
-    vec3_t avg_pos, std_pos;
-
-} physics_data;
 
 struct {
 
@@ -67,7 +62,7 @@ struct {
 } sim_data;
 
 
-double GS_looptime;
+float GS_looptime;
 
 #endif
 

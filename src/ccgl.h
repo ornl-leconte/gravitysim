@@ -28,9 +28,12 @@ Check gs_math.c and gs_math.h for most pure path routines
 #endif
 
 
-typedef struct _vec3_t {
-    float x, y, z;
-} vec3_t;
+typedef struct _vec4_t {
+
+    float x, y, z, w;
+
+} vec4_t;
+
 
 typedef struct _mat4_t {
     float v[4][4];
@@ -39,6 +42,10 @@ typedef struct _mat4_t {
 
 // quick creations
 #define V3(x, y, z) ((vec3_t){(x), (y), (z)})
+#define V4(x, y, z, w) ((vec4_t){(x), (y), (z), (w)})
+
+#define V3_V4(v) V3(v.x, v.y, v.z)
+#define V4_V3(v) V4(v.x, v.y, v.z, 0.0)
 
 
 #define M4_I M4_A( \

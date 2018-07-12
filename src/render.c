@@ -71,7 +71,7 @@ struct {
 
     GLuint vbo;
 
-    particle_t * buf;
+    vec4_t * buf;
 
 } particles;
 
@@ -164,7 +164,7 @@ void render_init() {
     scene.cam_dist = 250.0;
     scene.cam_fov = M_PI / 4.0;
 
-    particles.buf = (particle_t *)malloc(sizeof(particle_t) * n_particles);
+    particles.buf = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     
 
     /* basic opengl settings */
@@ -195,8 +195,6 @@ void render_init() {
     /* load shaders */
 
 
-    add_shader_path("../src");
-
     shaders.basic = load_shader("basic.v.shader", "basic.f.shader").program;
     shaders.instanced = load_shader("instanced.v.shader", "instanced.f.shader").program;
     shaders.plane = load_shader("plane.v.shader", "plane.f.shader").program;
@@ -208,7 +206,7 @@ void render_init() {
 }
 
 
-void update_transform_matrix(vec3_t camera_pos, vec3_t towards, vec3_t rot) {
+void update_transform_matrix(vec4_t camera_pos, vec4_t towards, vec4_t rot) {
 
     // identity
     //mat4_t model = MAT4_I;
@@ -220,7 +218,7 @@ void update_transform_matrix(vec3_t camera_pos, vec3_t towards, vec3_t rot) {
 
     mat4_t proj = perspective(scene.cam_fov, (float)win_width / (float)win_height, 0.01f, 1000.0f);
 
-    mat4_t view = look_at(camera_pos, towards, V3(0.0, 1.0, 0.0));
+    mat4_t view = look_at(camera_pos, towards, V4(0.0, 1.0, 0.0, 0.0));
 
     //mvp = mat4_mul(proj, view);
    // mvp = mat4_mul(mvp, model);
@@ -335,7 +333,7 @@ void render_particles() {
     glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, particles.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(particle_t) * enabled, particles.buf, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4_t) * enabled, particles.buf, GL_STREAM_DRAW);
     glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glVertexAttribDivisor(2, 1);
 
@@ -423,10 +421,10 @@ bool render_update() {
 
 
     scene.floor_model = mat4_mul(translator(0.0, -100.0, 0.0), scaler(100.0, 100.0, 100.0));
-    vec3_t center_pos = V3(0.0, 0.0, 0.0);
+    vec4_t center_pos = V4(0.0, 0.0, 0.0, 0.0);
 
-    vec3_t camera_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
-    update_transform_matrix(camera_pos, center_pos, V3(0.0, 0.0, 0.0));
+    vec4_t camera_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
+    update_transform_matrix(camera_pos, center_pos, V4(0.0, 0.0, 0.0, 0.0));
 
     scene.light_pos = camera_pos;
 

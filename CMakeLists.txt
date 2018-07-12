@@ -10,8 +10,6 @@ set (GRAVITYSIM_VERSION_MINOR 1)
 
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-
-
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -29,12 +27,27 @@ endif()
 
 find_package(OpenMP REQUIRED)
 
+find_package(OpenCL REQUIRED)
+
 
 #message(STATUS "Hello There")
 
 
 set (CMAKE_C_FLAGS "-O3 -ffast-math -g -Wall -pedantic -std=c99 ${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
+
+
+if (OpenMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    add_definitions(-DHAVE_OPENMP)
+endif()
+
+
+if (OpenCL_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenCL_LIBRARIES}")
+    include_directories(${OpenCL_INCLUDE_DIRS})
+    add_definitions(-DHAVE_OPENCL)
+endif()
 
 
 

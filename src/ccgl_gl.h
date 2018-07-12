@@ -13,7 +13,7 @@ ccgl_gl.h - OpenGL specific ccgl functionality
 
 #include <GL/glew.h> 
 #include <GLFW/glfw3.h>
-
+#include <string.h>
 
 typedef struct _shader_t {
 
@@ -36,17 +36,8 @@ typedef struct _model_t {
 model_t load_obj(char * obj_path);
 
 
-static struct {
-    int len;
-    char ** vals;
-
-    int _max_val_len;
-} shader_search;
-
-
-void add_shader_path(char * path);
-
 shader_t load_shader(char * v_name, char * f_name);
 
+char * _read_file(char * file_name);
 
 #endif

@@ -68,7 +68,7 @@ mat4_t rotator(float yaw, float pitch, float roll) {
 }
 
 // returns radians from center
-float get_period(vec3_t point) {
+float get_period(vec4_t point) {
     return atan2f(point.z, point.x);
 }
 
@@ -79,10 +79,10 @@ mat4_t frustrum(float l, float r, float b, float t, float n, float f) {
     return res;
 }
 
-mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler) {
-    vec3_t za = vec3_normalized(vec3_sub(camera, target));
-    vec3_t xa = vec3_normalized(vec3_cross(camera_euler, za));
-    vec3_t ya = vec3_cross(za, xa);
+mat4_t look_at(vec4_t camera, vec4_t target, vec4_t camera_euler) {
+    vec4_t za = vec4_normalized(vec4_sub(camera, target));
+    vec4_t xa = vec4_normalized(vec4_cross_3(camera_euler, za));
+    vec4_t ya = vec4_cross_3(za, xa);
 
     mat4_t orient = mat4_create(
         xa.x, xa.y, xa.z, 0.0,
@@ -103,11 +103,12 @@ mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler) {
 
 
 // period is the period in the XZ plane
-vec3_t camera_orbit(vec3_t center, float dist, float period, float pitch) {
-    vec3_t camera_pos = center;
+vec4_t camera_orbit(vec4_t center, float dist, float period, float pitch) {
+    vec4_t camera_pos = center;
     camera_pos.x += dist * (cosf(pitch) * sinf(period));
     camera_pos.y += dist * (sinf(pitch));
     camera_pos.z += dist * (cosf(pitch) * cosf(period));
+    camera_pos.w = 0.0;
     return camera_pos;
 }
 
@@ -151,13 +152,13 @@ void dump_mat4(mat4_t a) {
 }
 
 
-inline vec3_t vec3_cross(vec3_t a, vec3_t b) {
+vec4_t vec4_cross_3(vec4_t a, vec4_t b) {
 
     float r_x = a.y * b.z - a.z * b.y;
     float r_y = a.z * b.x - a.x * b.z;
     float r_z = a.x * b.y - a.y * b.x;
 
-    return V3(r_x, r_y, r_z);
+    return V4(r_x, r_y, r_z, 0.0);
 }
 
 mat4_t mat4_transpose(mat4_t a) {
@@ -198,37 +199,33 @@ mat4_t mat4_create(
     return r;
 }
 
-inline vec3_t vec3_add(vec3_t a, vec3_t b) {
-    return V3(a.x+b.x, a.y+b.y, a.z+b.z);
+vec4_t vec4_add(vec4_t a, vec4_t b) {
+    return V4(a.x+b.x, a.y+b.y, a.z+b.z, a.w+b.w);
 }
-inline vec3_t vec3_sub(vec3_t a, vec3_t b) {
-    return V3(a.x-b.x, a.y-b.y, a.z-b.z);
-}
-inline float vec3_dot(vec3_t a, vec3_t b) {
-    return a.x*b.x + a.y*b.y + a.z*b.z;
+vec4_t vec4_sub(vec4_t a, vec4_t b) {
+    return V4(a.x-b.x, a.y-b.y, a.z-b.z, a.w-b.w);
 }
 
-inline vec3_t vec3_scale(vec3_t a, float b) {
-    return V3(a.x*b, a.y*b, a.z*b);
+float vec4_dot(vec4_t a, vec4_t b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 }
 
-inline vec3_t vec3_normalized(vec3_t a) {
-    return vec3_scale(a, 1.0 / sqrt(a.x*a.x+a.y*a.y+a.z*a.z));
+vec4_t vec4_scale(vec4_t a, float b) {
+    return V4(a.x*b, a.y*b, a.z*b, a.w*b);
 }
 
-float vec3_normscale(vec3_t a) {
-    return 1.0 / sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
+vec4_t vec4_normalized(vec4_t a) {
+    return vec4_scale(a, 1.0 / sqrt(a.x*a.x+a.y*a.y+a.z*a.z+a.w*a.w));
 }
 
-float calculate_distance_squared(vec3_t a, vec3_t b) {
-    return SQR(a.x - b.x) + SQR(a.y - b.y) + SQR(a.z - b.z);
+
+float calculate_distance_squared(vec4_t a, vec4_t b) {
+    return SQR(a.x - b.x) + SQR(a.y - b.y) + SQR(a.z - b.z) + SQR(a.w - b.w);
 }
 
-float calculate_distance(vec3_t a, vec3_t b) {
+float calculate_distance(vec4_t a, vec4_t b) {
     return SQRT(calculate_distance_squared(a, b));
 }
-
-
 
 
 /* generative functions */
@@ -237,28 +234,5 @@ float calculate_distance(vec3_t a, vec3_t b) {
 // between 0.0 and 1.0 (including 0.0 and 1.0)
 float random_float() {
     return (float)rand() / (float)(RAND_MAX - 1);
-}
-
-
-
-/*
-
-
-these points are centered around 'center' and have a max difference of center_range in each respective channel
-
-They exist within the rectangular prism
-
-*/
-
-float float_gen_default(float fa, float fr) {
-    return fa + (random_float() - 0.5) * fr;
-}
-
-vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float zr) {
-    vec3_t res;
-    res.x = float_gen_default(xa, xr);
-    res.y = float_gen_default(ya, yr);
-    res.z = float_gen_default(za, zr);
-    return res;
 }
 

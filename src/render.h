@@ -18,7 +18,7 @@ GLFWwindow *window;
 
 struct {
 
-    vec3_t light_pos;
+    vec4_t light_pos;
 
     mat4_t floor_model;
 

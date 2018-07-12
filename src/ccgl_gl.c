@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,19 +13,6 @@
 
 
 
-void add_shader_path(char * path) {
-    shader_search.len++;
-    if (shader_search.len == 1) {
-        shader_search.vals = (char **)malloc(sizeof(char *));
-        shader_search._max_val_len = strlen(path);
-    } else {
-        shader_search.vals = (char **)realloc((void *)shader_search.vals, sizeof(char *) * shader_search.len);
-        if (strlen(path) > shader_search._max_val_len) shader_search._max_val_len = strlen(path);
-    }
-    shader_search.vals[shader_search.len - 1] = strdup(path);
-}
-
-
 char * _read_file(char * file_name) {
 
     FILE * fp = fopen(file_name, "r");
@@ -34,14 +22,16 @@ char * _read_file(char * file_name) {
     fseek(fp, 0, SEEK_END);
 
     int fp_l = ftell(fp);
-    rewind(fp);
+    //rewind(fp);
+
+    fseek(fp, 0, SEEK_SET);
 
     char * from_file = (char *)malloc(fp_l + 1);
-    int r_count = fread(from_file, 1, fp_l, fp);
+    fread(from_file, fp_l, 1, fp);
+    
+    fclose(fp);
     
     from_file[fp_l] = 0;
-
-    fclose(fp);
     return from_file;
 
 }
@@ -50,73 +40,67 @@ shader_t load_shader(char * v_name, char * f_name) {
     shader_t res;
 
     int i;
-    char * cv_name = malloc(strlen(v_name) + shader_search._max_val_len + 256), 
-         * cf_name = malloc(strlen(f_name) + shader_search._max_val_len + 256);
+    char * cv_name = malloc(strlen(v_name) + shared_data_dir + 256), 
+         * cf_name = malloc(strlen(f_name) + shared_data_dir + 256);
     bool v_found = false, f_found = false;
 
     char *cv_source = NULL, *cf_source = NULL;
-    for (i = 0; i < shader_search.len && (!v_found || !f_found); ++i) {
-        if (!v_found) {
-            sprintf(cv_name, "%s/%s", shader_search.vals[i], v_name);
-            log_debug("trying shader %s", cv_name);
-            if ((cv_source = _read_file(cv_name)) != NULL) {
+    sprintf(cv_name, "%s/src/shaders/%s", shared_data_dir, v_name);
+    log_debug("trying shader %s", cv_name);
+    if ((cv_source = _read_file(cv_name)) != NULL) {
 
-                GLuint vr = glCreateShader(GL_VERTEX_SHADER);
+        GLuint vr = glCreateShader(GL_VERTEX_SHADER);
 
-                log_trace("shader '%s' source:\n%s", cv_name, cv_source);
+        log_trace("shader '%s' source:\n%s", cv_name, cv_source);
 
 
-                glShaderSource(vr, 1, &cv_source, NULL);
-                glCompileShader(vr);
+        glShaderSource(vr, 1, &cv_source, NULL);
+        glCompileShader(vr);
 
-                GLint result_check, log_length;
-                glGetShaderiv(vr, GL_COMPILE_STATUS, &result_check);
-                glGetShaderiv(vr, GL_INFO_LOG_LENGTH, &log_length);
+        GLint result_check, log_length;
+        glGetShaderiv(vr, GL_COMPILE_STATUS, &result_check);
+        glGetShaderiv(vr, GL_INFO_LOG_LENGTH, &log_length);
 
-                if (result_check == GL_FALSE) {
-                    char * error_log = malloc(log_length + 1);
+        if (result_check == GL_FALSE) {
+            char * error_log = malloc(log_length + 1);
 
-                    glGetShaderInfoLog(vr, log_length, NULL, error_log);
+            glGetShaderInfoLog(vr, log_length, NULL, error_log);
 
-                    log_error("while compiling shader '%s': \n%s\n", cv_name, error_log);
-                
-                    exit(1);
-                }
-                v_found = true;
-                res.v_shader = vr;
-                free(cv_source);
-            }
+            log_error("while compiling shader '%s': \n%s\n", cv_name, error_log);
+        
+            exit(1);
         }
-        if (!f_found) {
-            sprintf(cf_name, "%s/%s", shader_search.vals[i], f_name);
-            log_debug("trying shader %s", cf_name);
-            if ((cf_source = _read_file(cf_name)) != NULL) {
+        v_found = true;
+        res.v_shader = vr;
+        free(cv_source);
+    }
+    sprintf(cf_name, "%s/src/shaders/%s", shared_data_dir, f_name);
+    log_debug("trying shader %s", cf_name);
+    if ((cf_source = _read_file(cf_name)) != NULL) {
 
-                GLuint fr = glCreateShader(GL_FRAGMENT_SHADER);
+        GLuint fr = glCreateShader(GL_FRAGMENT_SHADER);
 
-                log_trace("shader '%s' source:\n%s", cv_name, cv_source);
+        log_trace("shader '%s' source:\n%s", cf_name, cf_source);
 
-                glShaderSource(fr, 1, &cf_source, NULL);
-                glCompileShader(fr);
+        glShaderSource(fr, 1, &cf_source, NULL);
+        glCompileShader(fr);
 
-                GLint result_check, log_length;
-                glGetShaderiv(fr, GL_COMPILE_STATUS, &result_check);
-                glGetShaderiv(fr, GL_INFO_LOG_LENGTH, &log_length);
+        GLint result_check, log_length;
+        glGetShaderiv(fr, GL_COMPILE_STATUS, &result_check);
+        glGetShaderiv(fr, GL_INFO_LOG_LENGTH, &log_length);
 
-                if (result_check == GL_FALSE) {
-                    char * error_log = malloc(log_length + 1);
+        if (result_check == GL_FALSE) {
+            char * error_log = malloc(log_length + 1);
 
-                    glGetShaderInfoLog(fr, log_length, NULL, error_log);
+            glGetShaderInfoLog(fr, log_length, NULL, error_log);
 
-                    log_error("while compiling shader '%s': \n%s\n", cf_name, error_log);
-                
-                    exit(1);
-                }
-                f_found = true;
-                res.f_shader = fr;
-                free(cf_source);
-            }
+            log_error("while compiling shader '%s': \n%s\n", cf_name, error_log);
+        
+            exit(1);
         }
+        f_found = true;
+        res.f_shader = fr;
+        free(cf_source);
     }
 
     if (v_found && f_found) {
@@ -157,6 +141,10 @@ typedef struct _i3_t {
     int x, y, z;
 
 } i3_t;
+
+typedef struct vec3_t {
+    float x, y, z;
+} vec3_t;
 
 model_t load_obj(char * obj_path) {
 

@@ -18,12 +18,13 @@ float gravity_coef = 9.81;
 // global particles array
 int n_particles = 10;
 
-double GS_looptime = 0.0;
+float GS_looptime = 0.0;
 
+char * shared_data_dir = NULL;
 
 int i_p = 0;
 
-void spawn_cluster(vec3_t center, float rad, float mass, int n) {
+void spawn_cluster(vec4_t center, float rad, float mass, int n) {
 
     int i;
     for (i = 0; i < n && i_p < n_particles; ++i) {
@@ -32,14 +33,14 @@ void spawn_cluster(vec3_t center, float rad, float mass, int n) {
         float pitch = M_PI * (random_float() - 0.5);
         float trad = rad * random_float();
 
-        particle_t part;
+        vec4_t part;
         part.x = trad * cosf(pitch) * cosf(y_rot);
         part.y = trad * sinf(pitch);
         part.z = trad * cosf(pitch) * sinf(y_rot);
-        part.mass = mass;
+        part.w = mass;
         particle_data.P[i_p] = part;
-        particle_data.forces[i_p] = V3(0.0, 0.0, 0.0);
-        particle_data.velocities[i_p] = V3(0.0, 0.0, 0.0);
+        particle_data.forces[i_p] = V4(0.0, 0.0, 0.0, 0.0);
+        particle_data.velocities[i_p] = V4(0.0, 0.0, 0.0, 0.0);
         particle_data.is_enabled[i_p] = true;
         i_p++;
     }
@@ -52,13 +53,15 @@ int main(int argc, char ** argv) {
 
     char c;
 
+    shared_data_dir = ".";
+
     while ((c = getopt(argc, argv, "n:v:S:w:G:h")) != (char)(-1)) switch (c) {
         case 'h':
             printf("Usage: gravitysim [options]\n");
             printf("\n");
             printf("  -h                prints this help\n");
             printf("  -v [N]            sets verbosity (5=EVERYTHING, 1=ERRORS ONLY)\n");
-            printf("  -S [dir]          shader directory\n");
+            printf("  -S [dir]          sets the shared directory (${SHARED_DIR}/src should be where most stuff is stored)\n");
             printf("  -w [WxH]          width and height of window (0 for either for fullscreen)\n");
             printf("  -G [f]            gravity constant\n");
             printf("\n");
@@ -68,7 +71,8 @@ int main(int argc, char ** argv) {
             log_set_level(atoi(optarg));
             break;
         case 'S':
-            add_shader_path(optarg);
+            //add_shader_path(optarg);
+            shared_data_dir = strdup(optarg);
             break;
         case 'w':
             sscanf(optarg, "%dx%d", &win_width, &win_height);
@@ -96,12 +100,12 @@ int main(int argc, char ** argv) {
     log_info("number of particles: %d", n_particles);
 
 
-    particle_data.P = (particle_t *)malloc(sizeof(particle_t) * n_particles);
-    particle_data.velocities = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
-    particle_data.forces = (vec3_t *)malloc(sizeof(vec3_t) * n_particles);
+    particle_data.P = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    particle_data.velocities = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    particle_data.forces = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     particle_data.is_enabled = (bool *)malloc(sizeof(bool) * n_particles);
 
-    spawn_cluster(V3(0.0, 0.0, 0.0), 100.0, 1.0, n_particles);
+    spawn_cluster(V4(0.0, 0.0, 0.0, 0.0), 100.0, 1.0, n_particles);
 /*
     int i;
 
@@ -133,30 +137,29 @@ int main(int argc, char ** argv) {
 
     while (keep_going) {
 
+        float total_st = glfwGetTime(), total_et;
+
         control_update();
 
         float ph_st = glfwGetTime(), ph_et;
 
+
+        physics_exts.need_recalc_position = true;
+
         if (!sim_data.is_paused) {
             
-            //physics_loop_no_collision();
-            //physics_loop_naive();
-            physics_loop_naive_parallel();
+            //physics_loop_naive_opencl();            
+            physics_loop_naive();
+            //physics_loop_naive_parallel();
             
-            
-            float up_st = glfwGetTime(), up_et;
 
-            physics_update_positions();
-            //physics_update_statistics();
+            // some methods may update position implicitly
+            if (physics_exts.need_recalc_position) {
+                physics_update_positions();
+            }
 
             // keep them in a box
             physics_clamp_positions();
-
-            up_et = glfwGetTime();
-
-/*
-
-            */
         }
 
         ph_et = glfwGetTime();
@@ -166,19 +169,23 @@ int main(int argc, char ** argv) {
             if (particle_data.is_enabled[i]) particle_data._num_enabled++;
         }
 
-        float rn_st = glfwGetTime(), rn_et;        
+        float rn_st = glfwGetTime(), rn_et;
+
         keep_going = render_update();
+
         rn_et = glfwGetTime();
 
-        GS_looptime = rn_et + ph_et - rn_st - ph_st;
+        total_et = glfwGetTime();
+
+        GS_looptime = total_et - total_st;
 
         if (log_get_level() >= LOG_DEBUG) {
-            printf("loop time: %3.2f ms, phys time %3.2f ms", 1000.0 * (rn_et + ph_et - rn_st - ph_st), 1000.0 * (ph_et - ph_st));
+            printf("loop time: %3.2f ms, phys time %3.2f ms", 1000.0 * GS_looptime, 1000.0 * (ph_et - ph_st));
         }
 
         if (log_get_level() >= LOG_TRACE) {
             printf(", instances: %d", particle_data._num_enabled);
-            printf(", avg_pos: %f,%f,%f", physics_data.avg_pos.x, physics_data.avg_pos.y, physics_data.avg_pos.z);
+            //printf(", avg_pos: %f,%f,%f", physics_data.avg_pos.x, physics_data.avg_pos.y, physics_data.avg_pos.z);
         }
 
         if (log_get_level() >= LOG_DEBUG) {

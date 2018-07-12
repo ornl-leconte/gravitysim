@@ -27,10 +27,10 @@ math routines for gravity sim
     )
 
 
-vec3_t vec3_add(vec3_t a, vec3_t b);
-vec3_t vec3_sub(vec3_t a, vec3_t b);
-float vec3_dot(vec3_t a, vec3_t b);
-vec3_t vec3_scale(vec3_t a, float b);
+vec4_t vec4_add(vec4_t a, vec4_t b);
+vec4_t vec4_sub(vec4_t a, vec4_t b);
+float vec4_dot(vec4_t a, vec4_t b);
+vec4_t vec4_scale(vec4_t a, float b);
 
 mat4_t mat4_scale(mat4_t a, float b);
 
@@ -40,7 +40,7 @@ mat4_t rotator(float yaw, float pitch, float roll);
 
 mat4_t scaler(float X, float Y, float Z);
 
-float get_period(vec3_t point);
+float get_period(vec4_t point);
 
 mat4_t translator(float Xoff, float Yoff, float Zoff);
 
@@ -49,19 +49,19 @@ float random_float();
 
 mat4_t mat4_mul(mat4_t a, mat4_t b);
 
-vec3_t vec3_normalized(vec3_t a) ;
-vec3_t vec3_cross(vec3_t a, vec3_t b);
+vec4_t vec4_normalized(vec4_t a) ;
+vec4_t vec4_cross_3(vec4_t a, vec4_t b);
 
-mat4_t look_at(vec3_t camera, vec3_t target, vec3_t camera_euler);
-vec3_t camera_orbit(vec3_t center, float dist, float period, float pitch);
-float calculate_distance_squared(vec3_t a, vec3_t b);
-float calculate_distance(vec3_t a, vec3_t b);
+mat4_t look_at(vec4_t camera, vec4_t target, vec4_t camera_euler);
+vec4_t camera_orbit(vec4_t center, float dist, float period, float pitch);
+float calculate_distance_squared(vec4_t a, vec4_t b);
+float calculate_distance(vec4_t a, vec4_t b);
 
 void dump_mat4(mat4_t a);
 
 // return distance between 'a' and 'b'
-float calculate_distance(vec3_t a, vec3_t b);
-float vec3_normscale(vec3_t a);
+float calculate_distance(vec4_t a, vec4_t b);
+float vec4_normscale(vec4_t a);
 
 mat4_t mat4_create(
     float v00, float v01, float v02, float v03,
@@ -74,7 +74,6 @@ mat4_t mat4_create(
 float float_gen_default(float fa, float fr);
 // generates stuff
 
-vec3_t vec3_gen_default(float xa, float xr, float ya, float yr, float za, float zr);
 
 
 
