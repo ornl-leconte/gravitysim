@@ -1,9 +1,11 @@
 cmake_minimum_required (VERSION 2.6)
 
+SET(CMAKE_CUDA_COMPILER ${CMAKE_SOURCE_DIR}/my_nvcc)
+project (gravitysim LANGUAGES C CUDA)
+
 cmake_policy(SET CMP0017 OLD) 
 
 
-project (gravitysim C)
 set (GRAVITYSIM_VERSION_MAJOR 0)
 set (GRAVITYSIM_VERSION_MINOR 1)
 
@@ -15,12 +17,15 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 
 
-option(WITH_OPENCL "Build with OpenCL" ON)
-
-
-if (WITH_OPENCL)
 find_package(OpenCL)
+
+find_package(CUDA)
+
+if (CUDA_FOUND)
+    message(STATUS "using cuda")
+    add_definitions(-DHAVE_CUDA)
 endif()
+
 
 set (CMAKE_C_FLAGS "-O3 -ffast-math -g -Wall -pedantic -std=c99 ${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")

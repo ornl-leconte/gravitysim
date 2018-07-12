@@ -11,8 +11,6 @@ physics calculations
 #include "gravitysim.h"
 
 
-float GS_looptime;
-
 vec4_t calculate_force(vec4_t a, vec4_t b);
 
 vec4_t particle_get_position(vec4_t a);
@@ -45,6 +43,12 @@ void physics_loop_naive_parallel();
 #ifdef HAVE_OPENCL
 void physics_loop_naive_opencl();
 #endif
+
+
+#ifdef HAVE_CUDA
+void physics_loop_naive_cuda();
+#endif
+
 
 #endif
 

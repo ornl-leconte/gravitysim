@@ -210,9 +210,10 @@ int main(int argc, char ** argv) {
             if (sim_read != NULL) {
                 gs_store_read_frame();
             } else {
+                physics_loop_naive_cuda();            
                 //physics_loop_naive_opencl();            
                 //physics_loop_naive();
-                physics_loop_naive_parallel();
+                //physics_loop_naive_parallel();
 
                 // universal gravity constant
                 if (physics_exts.need_add_gravity) physics_add_gravity();
