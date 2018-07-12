@@ -59,12 +59,14 @@ struct {
 // struct to sort and apply different qualities/models;
 struct {
 
-    float * dist_sqr;
+    float * qual;
+
+    vec4_t * sorted_particles;
 
     GLuint vbo;
 
-    int Q_2_len, Q_3_len, Q_4_len, Q_5_len, Q_6_len, Q_7_len;
-    vec4_t * Q_2, * Q_3, * Q_4, * Q_5, * Q_6, * Q_7;
+    int Q_1_len, Q_2_len, Q_3_len, Q_4_len, Q_5_len, Q_6_len, Q_7_len;
+    vec4_t * Q_1, * Q_2, * Q_3, * Q_4, * Q_5, * Q_6, * Q_7;
 
 } render_div;
 
@@ -243,7 +245,9 @@ void render_init() {
 
     /* for distance changing */
 
-    render_div.dist_sqr = (float *)malloc(sizeof(float) * n_particles);
+    render_div.qual = (float *)malloc(sizeof(float) * n_particles);
+    render_div.sorted_particles = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    render_div.Q_1 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     render_div.Q_2 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     render_div.Q_3 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     render_div.Q_4 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
@@ -343,6 +347,7 @@ void _basic_render() {
 
 // method to just assign all to Q4
 void sort_particles_allQ2() {
+    render_div.Q_1_len = 0;
     render_div.Q_2_len = n_particles;
     render_div.Q_3_len = 0;
     render_div.Q_4_len = 0;
@@ -351,7 +356,32 @@ void sort_particles_allQ2() {
     render_div.Q_7_len = 0;
     memcpy(render_div.Q_2, particle_data.P, sizeof(vec4_t) * n_particles);
 }
+
+int particle_comp(void * _a, void * _b) {
+    vec4_t a = *(vec4_t *)_a, b = *(vec4_t *)_b;
+    float dx = scene.cam_pos.x - a.x;
+    float dy = scene.cam_pos.y - a.y;
+    float dz = scene.cam_pos.z - a.z;
+
+    float qual_a = (dx * dx + dy * dy + dz * dz) / a.w;
+
+    dx = scene.cam_pos.x - b.x;
+    dy = scene.cam_pos.y - b.y;
+    dz = scene.cam_pos.z - b.z;
+
+    float qual_b = (dx * dx + dy * dy + dz * dz) / b.w;
+    
+    if (qual_a > qual_b) {
+        return 1;
+    } else if (qual_a < qual_b) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 void sort_particles() {
+    render_div.Q_1_len = 0;
     render_div.Q_2_len = 0;
     render_div.Q_3_len = 0;
     render_div.Q_4_len = 0;
@@ -359,56 +389,31 @@ void sort_particles() {
     render_div.Q_6_len = 0;
     render_div.Q_7_len = 0;
 
-    float avg_dist_sqr = 0.0;
-    
+
+    memcpy(render_div.sorted_particles, particle_data.P, n_particles * sizeof(vec4_t));
+
+    qsort(render_div.sorted_particles, n_particles, sizeof(vec4_t), particle_comp);
+
 
     int i;
     for (i = 0; i < n_particles; ++i) {
-        float dx = scene.cam_pos.x - particle_data.P[i].x;
-        float dy = scene.cam_pos.y - particle_data.P[i].y;
-        float dz = scene.cam_pos.z - particle_data.P[i].z;
-
-        float dist_sqr = dx * dx + dy * dy + dz * dz;
-
-        avg_dist_sqr += dist_sqr;
-
-        render_div.dist_sqr[i] = dist_sqr;
-    }
-
-    avg_dist_sqr /= n_particles;
-
-    float std_dist_sqr = 0.0;
-    for (i = 0; i < n_particles; ++i) {
-        float diff = render_div.dist_sqr[i] - avg_dist_sqr;
-        std_dist_sqr += diff * diff;
-    }
-
-    std_dist_sqr = sqrtf(std_dist_sqr / (n_particles - 1));
-
-    for (i = 0; i < n_particles; ++i) {
-        // regularized z score
-        float z_score = (render_div.dist_sqr[i] - avg_dist_sqr) / std_dist_sqr;
-        // will be positive value, the average distance will be 1.0
-        //float exp_z_score = expf(z_score);
-
-        // choose render quality
-        // highest quality is 4, lowest is 2
-
         // use a really high quality sphere if it's so close
         // but only render 4 of these max
-        if (render_div.dist_sqr[i] <= 10.0 * 10.0 && render_div.Q_7_len < 4) {
-            render_div.Q_7[render_div.Q_7_len++] = particle_data.P[i];
-        } else if (z_score < -1.1 && render_div.Q_6_len < 24.0 + 0.03 * n_particles) {
-            // only render maximum 24+5% of these
-            render_div.Q_6[render_div.Q_6_len++] = particle_data.P[i];
-        } else if (z_score < -0.75 && render_div.Q_5_len < 50.0 + 0.18 * n_particles) {
-            render_div.Q_5[render_div.Q_5_len++] = particle_data.P[i];
-        } else if (z_score < 0.25 && render_div.Q_4_len < 100.0 + 0.35 * n_particles) {
-            render_div.Q_4[render_div.Q_4_len++] = particle_data.P[i];
-        } else if (z_score < 1.5) {
-            render_div.Q_3[render_div.Q_3_len++] = particle_data.P[i];
+        vec4_t ca = render_div.sorted_particles[i];
+        if (render_div.Q_7_len < 4 && n_particles <= 1024) {
+            render_div.Q_7[render_div.Q_7_len++] = ca;
+        } else if (render_div.Q_6_len < 10 && n_particles <= 2048) {
+            render_div.Q_6[render_div.Q_6_len++] = ca;
+        } else if (render_div.Q_5_len < 0.04 * n_particles && n_particles <= 4096) {
+            render_div.Q_5[render_div.Q_5_len++] = ca;
+        } else if (render_div.Q_4_len < 0.10 * n_particles && n_particles <= 8196) {
+            render_div.Q_4[render_div.Q_4_len++] = ca;
+        } else if (render_div.Q_3_len < 0.25 * n_particles && n_particles <= 16384) {
+            render_div.Q_3[render_div.Q_3_len++] = ca;
+        } else if (render_div.Q_3_len < 0.35 * n_particles) {
+            render_div.Q_2[render_div.Q_2_len++] = ca;
         } else {
-            render_div.Q_2[render_div.Q_2_len++] = particle_data.P[i];
+            render_div.Q_1[render_div.Q_1_len++] = ca;
         }
     }
     //printf("Q2:%lf,Q3:%lf,Q4:%lf,Q5:%lf,Q6:%lf,Q7:%lf\n", (float)render_div.Q_2_len/n_particles, (float)render_div.Q_3_len/n_particles, (float)render_div.Q_4_len/n_particles, (float)render_div.Q_5_len/n_particles, (float)render_div.Q_6_len/n_particles, (float)render_div.Q_7_len/n_particles);
@@ -465,8 +470,10 @@ void render_particles() {
     //_render_particles_pass(prefabs.particles.ico.Q_1, render_div.Q_1, render_div.Q_1_len);
 
     // optimized for close particles beinghigher quality
-    if (false) {
+    if (true) {
+        // multipass render
         sort_particles();
+        _render_particles_pass(prefabs.particles.ico.Q_1, render_div.Q_1, render_div.Q_1_len);
         _render_particles_pass(prefabs.particles.ico.Q_2, render_div.Q_2, render_div.Q_2_len);
         _render_particles_pass(prefabs.particles.ico.Q_3, render_div.Q_3, render_div.Q_3_len);
         _render_particles_pass(prefabs.particles.ico.Q_4, render_div.Q_4, render_div.Q_4_len);
@@ -474,9 +481,9 @@ void render_particles() {
         _render_particles_pass(prefabs.particles.ico.Q_6, render_div.Q_6, render_div.Q_6_len);
         _render_particles_pass(prefabs.particles.ico.Q_7, render_div.Q_7, render_div.Q_7_len);
     } else {
-        //_render_particles_pass(prefabs.particles.ico.Q_1, particle_data.P, n_particles);
-       // _render_particles_pass(prefabs.particles.special.blocky, particle_data.P, n_particles);
-        _render_particles_pass(prefabs.particles.special.mememan, particle_data.P, n_particles);
+        _render_particles_pass(prefabs.particles.ico.Q_1, particle_data.P, n_particles);
+        //_render_particles_pass(prefabs.particles.special.blocky, particle_data.P, n_particles);
+        //_render_particles_pass(prefabs.particles.special.mememan, particle_data.P, n_particles);
     }
 
 }
