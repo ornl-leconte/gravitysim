@@ -39,10 +39,11 @@ char * _read_file(char * file_name) {
 shader_t load_shader(char * v_name, char * f_name) {
     shader_t res;
 
-    int i;
-    char * cv_name = malloc(strlen(v_name) + shared_data_dir + 256), 
-         * cf_name = malloc(strlen(f_name) + shared_data_dir + 256);
+    char * cv_name = malloc(strlen(v_name) + strlen(shared_data_dir) + 256), 
+         * cf_name = malloc(strlen(f_name) + strlen(shared_data_dir) + 256);
+    
     bool v_found = false, f_found = false;
+
 
     char *cv_source = NULL, *cf_source = NULL;
     sprintf(cv_name, "%s/src/shaders/%s", shared_data_dir, v_name);
@@ -54,7 +55,7 @@ shader_t load_shader(char * v_name, char * f_name) {
         log_trace("shader '%s' source:\n%s", cv_name, cv_source);
 
 
-        glShaderSource(vr, 1, &cv_source, NULL);
+        glShaderSource(vr, 1, (const char *const *)&cv_source, NULL);
         glCompileShader(vr);
 
         GLint result_check, log_length;
@@ -82,7 +83,7 @@ shader_t load_shader(char * v_name, char * f_name) {
 
         log_trace("shader '%s' source:\n%s", cf_name, cf_source);
 
-        glShaderSource(fr, 1, &cf_source, NULL);
+        glShaderSource(fr, 1, (const char *const *)&cf_source, NULL);
         glCompileShader(fr);
 
         GLint result_check, log_length;
@@ -146,7 +147,10 @@ typedef struct vec3_t {
     float x, y, z;
 } vec3_t;
 
-model_t load_obj(char * obj_path) {
+model_t load_obj(char * _obj_path) {
+
+    char * obj_path = malloc(strlen(shared_data_dir) + strlen(_obj_path) + 256);
+    sprintf(obj_path, "%s/%s", shared_data_dir, _obj_path);
 
     model_t res;
 
@@ -268,7 +272,7 @@ model_t load_obj(char * obj_path) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(vec3_t) * res.nbo_num, out_normals, GL_STATIC_DRAW);
 
     if (res.nbo_num != res.vbo_num) {
-        printf("while loading model '%s', vbo_num and nbo_num are different!\n");
+        printf("while loading model '%s', vbo_num and nbo_num are different!\n", obj_path);
         exit(1);
     }
 
@@ -280,6 +284,8 @@ model_t load_obj(char * obj_path) {
 
     free(out_verts);
     free(out_normals);
+
+    free(obj_path);
 
     return res;
 

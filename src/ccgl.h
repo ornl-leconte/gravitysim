@@ -19,8 +19,6 @@ Check gs_math.c and gs_math.h for most pure path routines
 #define __CCGL_H__
 
 
-
-
 #include <math.h>
 
 #ifndef M_PI

@@ -199,6 +199,9 @@ mat4_t mat4_create(
     return r;
 }
 
+vec4_t vec4_add_2(vec4_t a, vec4_t b, vec4_t c) {
+    return V4(a.x+b.x+c.x, a.y+b.y+c.y, a.z+b.z+c.z, a.w+b.w+c.w);
+}
 vec4_t vec4_add(vec4_t a, vec4_t b) {
     return V4(a.x+b.x, a.y+b.y, a.z+b.z, a.w+b.w);
 }

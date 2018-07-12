@@ -20,6 +20,8 @@ struct {
 
     vec4_t light_pos;
 
+    vec4_t cam_pos;
+
     mat4_t floor_model;
 
     float cam_dist, cam_period, cam_pitch, cam_fov;

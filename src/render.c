@@ -18,7 +18,7 @@
 #include <string.h>
 #include <math.h>
 
-int win_width = 640, win_height = 480;
+int win_width, win_height;
 
 int vp_width, vp_height;    
 
@@ -41,7 +41,32 @@ struct {
 
     model_t ico, cade, plane;
 
+
+    // spherical-type particles
+    struct {
+        struct{
+            // qualities 1-8 (8 highest)
+            model_t Q_1, Q_2, Q_3, Q_4, Q_5, Q_6, Q_7;
+        } ico;
+
+        struct {
+            model_t blocky, mememan;
+        } special;
+    } particles;
+
 } prefabs;
+
+// struct to sort and apply different qualities/models;
+struct {
+
+    float * dist_sqr;
+
+    GLuint vbo;
+
+    int Q_2_len, Q_3_len, Q_4_len, Q_5_len, Q_6_len, Q_7_len;
+    vec4_t * Q_2, * Q_3, * Q_4, * Q_5, * Q_6, * Q_7;
+
+} render_div;
 
 
 
@@ -67,13 +92,7 @@ struct {
 
 } transformations;
 
-struct {
 
-    GLuint vbo;
-
-    vec4_t * buf;
-
-} particles;
 
 
 // error handling
@@ -98,7 +117,7 @@ void error_callback(int error, const char* description) {
 void render_init() {
 
     // initializing glfw
-    if (glfwInit() != 1) {                                                  
+    if (glfwInit() != GLFW_TRUE) {                                                  
         printf("Glfw failed to init\n");     
         exit(1);                           
     }
@@ -111,11 +130,10 @@ void render_init() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
 #endif
-
     bool fullscreen = win_width == 0 || win_height == 0;
     if (fullscreen) {
+
         const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
         glfwWindowHint(GLFW_RED_BITS, mode->redBits);
         glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
@@ -126,25 +144,25 @@ void render_init() {
 
     } else {
         // it's important to create a window BEFORE intiailizing glew or anything
-        window = glfwCreateWindow(win_width, win_height, "gravitysim", NULL, NULL);
+        //glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+        window = glfwCreateWindow(640, 480, "gravitysim", NULL, NULL);
     }
-
-
-    glfwMakeContextCurrent(window);
-
-    glfwGetWindowSize(window, &win_width, &win_height);
-    glfwGetFramebufferSize(window, &vp_width, &vp_height);
 
     if (window == NULL) {
         printf("GLFW failed to create a window\n");
         exit(1);
     }
 
+    glfwMakeContextCurrent(window);
+
+    glfwGetWindowSize(window, &win_width, &win_height);
+    glfwGetFramebufferSize(window, &vp_width, &vp_height);
 
     // for some reason we need this to be set
-    glewExperimental = 1;                                               
-    if (glewInit() != GLEW_OK) {                                        
-        printf("GLEW failed to init\n");   
+    glewExperimental = 1;   
+    int glew_init_res = glewInit();                                            
+    if (glew_init_res != GLEW_OK) {                                        
+        printf("GLEW failed to init: %d\n", glew_init_res);   
         exit(1);                      
     }
 
@@ -164,7 +182,7 @@ void render_init() {
     scene.cam_dist = 250.0;
     scene.cam_fov = M_PI / 4.0;
 
-    particles.buf = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+
     
 
     /* basic opengl settings */
@@ -184,23 +202,57 @@ void render_init() {
 */
     /* model creation */
 
-    glGenBuffers(1, &particles.vbo);
+    glGenBuffers(1, &render_div.vbo);
 
     /* load objects */
 
-    prefabs.ico = load_obj("../models/ico.obj");
-    prefabs.cade = load_obj("../models/cade.obj");
-    prefabs.plane = load_obj("../models/plane.obj");
+    log_info("about to load models, this may take a while");
+
+
+    float st = glfwGetTime(), et;
+
+    prefabs.ico = load_obj("models/ico.obj");
+    
+    prefabs.cade = load_obj("models/cade.obj");
+    prefabs.plane = load_obj("models/plane.obj");
+
+    prefabs.particles.ico.Q_1 = load_obj("models/particle_ico_quality1.obj");
+    prefabs.particles.ico.Q_2 = load_obj("models/particle_ico_quality2.obj");
+    prefabs.particles.ico.Q_3 = load_obj("models/particle_ico_quality3.obj");
+    prefabs.particles.ico.Q_4 = load_obj("models/particle_ico_quality4.obj");
+    prefabs.particles.ico.Q_5 = load_obj("models/particle_ico_quality5.obj");
+    prefabs.particles.ico.Q_6 = load_obj("models/particle_ico_quality6.obj");
+    prefabs.particles.ico.Q_7 = load_obj("models/particle_ico_quality7.obj");
+
+    prefabs.particles.special.blocky = load_obj("models/particle_blocky.obj");
+    prefabs.particles.special.mememan = load_obj("models/particle_mememan.obj");
+
+    et = glfwGetTime();
+
+    log_info("done loading models, took %f ms", 1000.0 * (et - st));
 
     /* load shaders */
 
 
     shaders.basic = load_shader("basic.v.shader", "basic.f.shader").program;
+    
     shaders.instanced = load_shader("instanced.v.shader", "instanced.f.shader").program;
+
     shaders.plane = load_shader("plane.v.shader", "plane.f.shader").program;
 
-    GLCHK
 
+    /* for distance changing */
+
+    render_div.dist_sqr = (float *)malloc(sizeof(float) * n_particles);
+    render_div.Q_2 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    render_div.Q_3 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    render_div.Q_4 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    render_div.Q_5 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    render_div.Q_6 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    render_div.Q_7 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+
+
+    GLCHK
 
     log_info("render init done");
 }
@@ -289,8 +341,107 @@ void _basic_render() {
     //render_model(prefabs.ico);
 }
 
-void render_particles() {
+// method to just assign all to Q4
+void sort_particles_allQ2() {
+    render_div.Q_2_len = n_particles;
+    render_div.Q_3_len = 0;
+    render_div.Q_4_len = 0;
+    render_div.Q_5_len = 0;
+    render_div.Q_6_len = 0;
+    render_div.Q_7_len = 0;
+    memcpy(render_div.Q_2, particle_data.P, sizeof(vec4_t) * n_particles);
+}
+void sort_particles() {
+    render_div.Q_2_len = 0;
+    render_div.Q_3_len = 0;
+    render_div.Q_4_len = 0;
+    render_div.Q_5_len = 0;
+    render_div.Q_6_len = 0;
+    render_div.Q_7_len = 0;
 
+    float avg_dist_sqr = 0.0;
+    
+
+    int i;
+    for (i = 0; i < n_particles; ++i) {
+        float dx = scene.cam_pos.x - particle_data.P[i].x;
+        float dy = scene.cam_pos.y - particle_data.P[i].y;
+        float dz = scene.cam_pos.z - particle_data.P[i].z;
+
+        float dist_sqr = dx * dx + dy * dy + dz * dz;
+
+        avg_dist_sqr += dist_sqr;
+
+        render_div.dist_sqr[i] = dist_sqr;
+    }
+
+    avg_dist_sqr /= n_particles;
+
+    float std_dist_sqr = 0.0;
+    for (i = 0; i < n_particles; ++i) {
+        float diff = render_div.dist_sqr[i] - avg_dist_sqr;
+        std_dist_sqr += diff * diff;
+    }
+
+    std_dist_sqr = sqrtf(std_dist_sqr / (n_particles - 1));
+
+    for (i = 0; i < n_particles; ++i) {
+        // regularized z score
+        float z_score = (render_div.dist_sqr[i] - avg_dist_sqr) / std_dist_sqr;
+        // will be positive value, the average distance will be 1.0
+        //float exp_z_score = expf(z_score);
+
+        // choose render quality
+        // highest quality is 4, lowest is 2
+
+        // use a really high quality sphere if it's so close
+        // but only render 4 of these max
+        if (render_div.dist_sqr[i] <= 10.0 * 10.0 && render_div.Q_7_len < 4) {
+            render_div.Q_7[render_div.Q_7_len++] = particle_data.P[i];
+        } else if (z_score < -1.1 && render_div.Q_6_len < 24.0 + 0.03 * n_particles) {
+            // only render maximum 24+5% of these
+            render_div.Q_6[render_div.Q_6_len++] = particle_data.P[i];
+        } else if (z_score < -0.75 && render_div.Q_5_len < 50.0 + 0.18 * n_particles) {
+            render_div.Q_5[render_div.Q_5_len++] = particle_data.P[i];
+        } else if (z_score < 0.25 && render_div.Q_4_len < 100.0 + 0.35 * n_particles) {
+            render_div.Q_4[render_div.Q_4_len++] = particle_data.P[i];
+        } else if (z_score < 1.5) {
+            render_div.Q_3[render_div.Q_3_len++] = particle_data.P[i];
+        } else {
+            render_div.Q_2[render_div.Q_2_len++] = particle_data.P[i];
+        }
+    }
+    //printf("Q2:%lf,Q3:%lf,Q4:%lf,Q5:%lf,Q6:%lf,Q7:%lf\n", (float)render_div.Q_2_len/n_particles, (float)render_div.Q_3_len/n_particles, (float)render_div.Q_4_len/n_particles, (float)render_div.Q_5_len/n_particles, (float)render_div.Q_6_len/n_particles, (float)render_div.Q_7_len/n_particles);
+}
+
+void _render_particles_pass(model_t cur_Q, vec4_t * _parts, int _parts_len) {
+    if (_parts_len < 1) return;
+
+    glBindVertexArray(cur_Q.vao);
+
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, cur_Q.vbo);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, cur_Q.nbo);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, render_div.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4_t) * _parts_len, _parts, GL_STREAM_DRAW);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribDivisor(2, 1);
+
+
+    /* instancing */
+
+    glDrawArraysInstanced(GL_TRIANGLES, 0, cur_Q.nbo_num, _parts_len);
+}
+
+void render_particles() {
+    
     glUseProgram(shaders.instanced);
 
     int model_tr = glGetUniformLocation(shaders.instanced, "u_model_tr");
@@ -307,103 +458,30 @@ void render_particles() {
     glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
     glUniform3f(lightpos, scene.light_pos.x, scene.light_pos.y, scene.light_pos.z);
 
-    model_t model = prefabs.ico;
 
-    glBindVertexArray(model.vao);
+    //sort_particles_allQ2();
 
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, model.vbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+    // do render passes
+    //_render_particles_pass(prefabs.particles.ico.Q_1, render_div.Q_1, render_div.Q_1_len);
 
-
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, model.nbo);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-
-
-    int i;
-    int enabled = 0;
-    for (i = 0; i < n_particles; ++i) {
-        if (particle_data.is_enabled[i]) {
-            particles.buf[i] = particle_data.P[i];
-            enabled++;
-        }
+    // optimized for close particles beinghigher quality
+    if (false) {
+        sort_particles();
+        _render_particles_pass(prefabs.particles.ico.Q_2, render_div.Q_2, render_div.Q_2_len);
+        _render_particles_pass(prefabs.particles.ico.Q_3, render_div.Q_3, render_div.Q_3_len);
+        _render_particles_pass(prefabs.particles.ico.Q_4, render_div.Q_4, render_div.Q_4_len);
+        _render_particles_pass(prefabs.particles.ico.Q_5, render_div.Q_5, render_div.Q_5_len);
+        _render_particles_pass(prefabs.particles.ico.Q_6, render_div.Q_6, render_div.Q_6_len);
+        _render_particles_pass(prefabs.particles.ico.Q_7, render_div.Q_7, render_div.Q_7_len);
+    } else {
+        //_render_particles_pass(prefabs.particles.ico.Q_1, particle_data.P, n_particles);
+       // _render_particles_pass(prefabs.particles.special.blocky, particle_data.P, n_particles);
+        _render_particles_pass(prefabs.particles.special.mememan, particle_data.P, n_particles);
     }
-
-    glEnableVertexAttribArray(2);
-
-    glBindBuffer(GL_ARRAY_BUFFER, particles.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4_t) * enabled, particles.buf, GL_STREAM_DRAW);
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glVertexAttribDivisor(2, 1);
-
-
-
-    /* instancing */
-
-    glDrawArraysInstanced(GL_TRIANGLES, 0, model.nbo_num, enabled);
 
 }
-/*
-void _inst_render() {
-
-    glUseProgram(shaders.instanced);
-
-    int model_tr = glGetUniformLocation(shaders.instanced, "uni_model_tr");
-    int viewproj_tr = glGetUniformLocation(shaders.instanced, "uni_viewproj_tr");
-
-    int lightpos = glGetUniformLocation(shaders.instanced, "uni_lightpos");
-    int offset_array = glGetUniformLocation(shaders.instanced, "uni_particle_offests");
-    int offset_mass = glGetUniformLocation(shaders.instanced, "uni_particle_mass");
-
-    if (!(model_tr >= 0 && viewproj_tr >= 0 && lightpos >= 0 && offset_array >= 0 && offset_mass >= 0)) {
-        printf("error finding transformation shader positions\n");
-        exit(1);
-    }
-
-
-    glUniformMatrix4fv(model_tr, 1, GL_TRUE, &(transformations.model.v[0][0]));
-    glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
-    glUniform3f(lightpos, scene.light_pos.x, scene.light_pos.y, scene.light_pos.z);
-
-    vec3_t * enabled_poss = malloc(sizeof(vec3_t) * n_particles);
-    float * enabled_mass = malloc(sizeof(float) * n_particles);
-
-    int i;
-    int c = 0;
-    for (i = 0; i < n_particles; ++i) {
-        if (particle_data.is_enabled[i]) {
-            enabled_poss[c] = particle_data.positions[i];
-            enabled_mass[c] = particle_data.masses[i];
-            c++;
-        }
-    }
-    
-
-    glUniform3fv(offset_array, c, enabled_poss);
-    glUniform1fv(offset_mass,c , enabled_mass);
-
-    model_t model = prefabs.ico;
-
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, model.vbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, model.nbo);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-
-    glDrawArraysInstanced(GL_TRIANGLES, 0, model.vbo_num, c);
-    //log_trace("num instances: %d", c);
-
-}
-*/
-
 
 bool render_update() {
-
-    double st = glfwGetTime();
-
     if (glfwWindowShouldClose(window)) {
         printf("Window closing...\n");
         return false;
@@ -423,10 +501,12 @@ bool render_update() {
     scene.floor_model = mat4_mul(translator(0.0, -100.0, 0.0), scaler(100.0, 100.0, 100.0));
     vec4_t center_pos = V4(0.0, 0.0, 0.0, 0.0);
 
-    vec4_t camera_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
-    update_transform_matrix(camera_pos, center_pos, V4(0.0, 0.0, 0.0, 0.0));
+    scene.cam_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
+    update_transform_matrix(scene.cam_pos, center_pos, V4(0.0, 0.0, 0.0, 0.0));
 
-    scene.light_pos = camera_pos;
+    
+
+    scene.light_pos = scene.cam_pos;
 
    // scene.light_pos = V3(0.0, 0.0, 0.0);
 
@@ -446,7 +526,6 @@ bool render_update() {
     //_inst_render();
     
     render_particles();
-    //render_model(prefabs.ico);
 
     
     /* boiler plate stuff */

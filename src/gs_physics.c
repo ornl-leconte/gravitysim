@@ -3,7 +3,7 @@
 
 #include "gs_math.h"
 
-#define SOFT_FACTOR 0.25
+#define SOFT_FACTOR 0.25f
 
 
 vec4_t calculate_force(vec4_t a, vec4_t b) {
@@ -31,6 +31,14 @@ vec4_t particle_get_position(vec4_t a) {
 void physics_init() {
 }
 
+void physics_add_gravity() {
+    int i;
+    for (i = 0; i < n_particles; ++i) {
+        if (particle_data.is_enabled[i]) {
+            particle_data.forces[i] = vec4_add(particle_data.forces[i], universal_gravity);
+        }
+    }
+}
 void physics_update_positions() {
     float dt = GS_looptime;
     
@@ -39,16 +47,11 @@ void physics_update_positions() {
     for (i = 0; i < n_particles; ++i) {
         if (particle_data.is_enabled[i]) {
             // acceleration = force / mass (with timestep for discrete integration), because F = ma
-            vec4_t acc = vec4_scale(particle_data.forces[i], 1.0 / particle_data.P[i].w);
-
             // V(t) = integral{A(t) * dt}
-            particle_data.velocities[i] = vec4_add(particle_data.velocities[i], vec4_scale(acc, dt));
-
             // P(t) = integral{V(t) * dt}
-            vec4_t pos_update = vec4_add(particle_get_position(particle_data.P[i]), vec4_scale(particle_data.velocities[i], dt));
-            particle_data.P[i].x = pos_update.x;
-            particle_data.P[i].y = pos_update.y;
-            particle_data.P[i].z = pos_update.z;
+            vec4_t new_vel = vec4_add(particle_data.velocities[i], vec4_scale(particle_data.forces[i], dt / particle_data.P[i].w));;
+            particle_data.P[i] = vec4_add(particle_data.P[i], new_vel);
+            particle_data.velocities[i] = new_vel;
         }
     }
 }

@@ -6,13 +6,18 @@
 
 OpenGL, GLM, GLEW, GLFW
 
+Optionally:
+
+OpenCL (for faster physics computation)
+
+CUDA (for faster physics computation)
+
 
 ## Maths
 
 Here are some articles I used to implement rendering techniques, physics, etc:
 
   - [GPU-Based Ray-Casting of Quadratic Surfaces](http://reality.cs.ucl.ac.uk/projects/quadrics/pbg06.pdf)
-
 
 
 ## Running Notes

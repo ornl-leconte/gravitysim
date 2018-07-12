@@ -32,6 +32,8 @@ typedef struct _vec3i_t {
 // this is used for all sorts of things. For example 'shared_data_dir'/src/phys can get you kernels, etc
 char * shared_data_dir;
 
+// always added
+vec4_t universal_gravity;
 
 float gravity_coef;
 

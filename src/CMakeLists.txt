@@ -1,5 +1,4 @@
 
-
 set(extra_files "")
 set(extra_libs "")
 
@@ -9,13 +8,10 @@ if (OpenCL_FOUND)
 endif()
 
 
-add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c render.c render_vals.c gravitysim.h log.h gs_math.h gs_physics.h render.h render_vals.h controls.h phys/naive.c phys/naive_parallel.c ${extra_files})
+add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c render.c gs_store.c render_vals.c ccgl.c ccgl_gl.c ccgl.h ccgl_gl.h gravitysim.h log.h gs_math.h gs_physics.h gs_store.h render.h render_vals.h controls.h phys/naive.c phys/naive_parallel.c ${extra_files})
 
 
-add_library(ccgl ccgl.c ccgl_gl.c ccgl.h ccgl_gl.h)
-
-
-target_link_libraries(gravitysim m ccgl ${GLEW_LIBRARIES} glfw ${OPENGL_LIBRARIES} ${CMAKE_DL_LIBS} ${extra_libs})
+target_link_libraries(gravitysim m  ${CMAKE_DL_LIBS} ${GLEW_LIBRARIES} glfw ${OPENGL_LIBRARIES} ${extra_libs})
 
 
 install (FILES gravitysim.h DESTINATION include)

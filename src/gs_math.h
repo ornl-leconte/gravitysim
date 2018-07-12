@@ -28,6 +28,7 @@ math routines for gravity sim
 
 
 vec4_t vec4_add(vec4_t a, vec4_t b);
+vec4_t vec4_add_2(vec4_t a, vec4_t b, vec4_t c);
 vec4_t vec4_sub(vec4_t a, vec4_t b);
 float vec4_dot(vec4_t a, vec4_t b);
 vec4_t vec4_scale(vec4_t a, float b);

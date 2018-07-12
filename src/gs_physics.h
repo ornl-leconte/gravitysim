@@ -23,13 +23,18 @@ struct {
     
     bool need_recalc_position;
 
+    bool need_add_gravity;
+
+    bool need_clamp;
+
 } physics_exts;
 
 void physics_init();
 
+
+void physics_add_gravity();
 void physics_update_positions();
 void physics_clamp_positions();
-
 
 /* these are defined in phys/ folder */
 

@@ -26,7 +26,7 @@ typedef struct _shader_t {
 
 typedef struct _model_t {
 
-    int vbo, vao, nbo;
+    GLuint vbo, vao, nbo;
 
     int vbo_num, nbo_num;
 

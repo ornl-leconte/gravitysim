@@ -13,16 +13,23 @@
 #include <unistd.h>
 #include <getopt.h>
 
+#include "gs_store.h"
+
+vec4_t universal_gravity = V4(0.0, 0.0, 0.0, 0.0);
+
 float gravity_coef = 9.81;
 
 // global particles array
-int n_particles = 10;
+int n_particles;
 
 float GS_looptime = 0.0;
 
 char * shared_data_dir = NULL;
 
 int i_p = 0;
+
+int n_frames;
+
 
 void spawn_cluster(vec4_t center, float rad, float mass, int n) {
 
@@ -51,11 +58,20 @@ int main(int argc, char ** argv) {
 
     log_set_level(LOG_INFO);
 
+    win_width = 640;
+    win_height = 480;
+
+    bool do_show = true;
+
+    float L_time = -1.0f;
+
     char c;
 
     shared_data_dir = ".";
 
-    while ((c = getopt(argc, argv, "n:v:S:w:G:h")) != (char)(-1)) switch (c) {
+    char * sim_write = NULL, * sim_read = NULL;
+
+    while ((c = getopt(argc, argv, "n:v:S:w:G:F:O:I:L:Xh")) != (char)(-1)) switch (c) {
         case 'h':
             printf("Usage: gravitysim [options]\n");
             printf("\n");
@@ -63,7 +79,12 @@ int main(int argc, char ** argv) {
             printf("  -v [N]            sets verbosity (5=EVERYTHING, 1=ERRORS ONLY)\n");
             printf("  -S [dir]          sets the shared directory (${SHARED_DIR}/src should be where most stuff is stored)\n");
             printf("  -w [WxH]          width and height of window (0 for either for fullscreen)\n");
-            printf("  -G [f]            gravity constant\n");
+            printf("  -G [f]            gravitation constant\n");
+            printf("  -F [f,f,f]        additional gravity vector\n");
+            printf("  -X                this flag does no GUI (for baking computations)\n");
+            printf("  -L [f]            fixed loop time (for baking computations)\n");
+            printf("  -O [file]         store output into file\n");
+            printf("  -I [file]         replay baked computation output from -O\n");
             printf("\n");
             return 0;
             break;
@@ -83,6 +104,21 @@ int main(int argc, char ** argv) {
         case 'G':
             sscanf(optarg, "%f", &gravity_coef);
             break;
+        case 'F':
+            sscanf(optarg, "%f,%f,%f", &universal_gravity.x, &universal_gravity.y, &universal_gravity.z);
+            break;
+        case 'L':
+            sscanf(optarg, "%f", &L_time);
+            break;
+        case 'X':
+            do_show = false;
+            break;
+        case 'O':
+            sim_write = strdup(optarg);
+            break;
+        case 'I':
+            sim_read = strdup(optarg);
+            break;
         case '?':
             printf("Unknown argument: -%c\n", optopt);
             return 1;
@@ -97,6 +133,27 @@ int main(int argc, char ** argv) {
 
     log_info("gravity sim v%d.%d", GRAVITYSIM_VERSION_MAJOR, GRAVITYSIM_VERSION_MINOR);
     
+#ifdef HAVE_OPENCL
+    log_info("Running with OpenCL");
+#endif
+
+    if (!do_show) log_warn("no GUI will be displayed, we are using -X");
+
+    if (sim_write != NULL && sim_read != NULL) {
+        log_error("Can't specify -I and -O at the same time");
+        exit(1);
+    }
+
+    if (sim_write != NULL) {
+        log_info("writing output to '%s'", sim_write);
+        gs_store_write_init(sim_write);
+    }
+
+    if (sim_read != NULL) {
+        log_info("replaying simulation '%s'", sim_read);
+        gs_store_read_init(sim_read);
+    }
+
     log_info("number of particles: %d", n_particles);
 
 
@@ -105,20 +162,10 @@ int main(int argc, char ** argv) {
     particle_data.forces = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     particle_data.is_enabled = (bool *)malloc(sizeof(bool) * n_particles);
 
-    spawn_cluster(V4(0.0, 0.0, 0.0, 0.0), 100.0, 1.0, n_particles);
-/*
-    int i;
+    spawn_cluster(V4(50.0, 50.0, 0.0, 0.0), 0.0, 2000.0, 1);
+    spawn_cluster(V4(0.0, 0.0, 0.0, 0.0), 100.0, 12.0, n_particles-1);
 
-    for (i = 0; i < n_particles; ++i) {
-        particle_data.positions[i] = vec3_gen_default(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-        particle_data.velocities[i] = V3(0.0, 0.0, 0.0);
-        particle_data.forces[i] = V3(0.0, 0.0, 0.0);
-        particle_data.masses[i] = expf(2 * float_gen_default(0.5, 1.0));
-    }
-
-*/
-
-    sim_data.is_paused = false;
+    sim_data.is_paused = false;//true;
 
     particle_data._num_enabled = 0;
     int i;
@@ -126,61 +173,73 @@ int main(int argc, char ** argv) {
         if (particle_data.is_enabled[i]) particle_data._num_enabled++;
     }
 
+    n_frames = 0;
+
     physics_init();
 
-    control_init();
 
-    render_init();
+    if (do_show != 0) {
+        control_init();
 
+        render_init();
+    } else {
+        // we still use the timer
+        glfwInit();
+    }
+
+    log_info("all systems initialized");
 
     bool keep_going = true;
 
     while (keep_going) {
 
+        if (sim_write != NULL) gs_store_write_frame();
+        
         float total_st = glfwGetTime(), total_et;
 
-        control_update();
+        if (do_show != 0) {
+            control_update();
+        }
 
         float ph_st = glfwGetTime(), ph_et;
 
-
         physics_exts.need_recalc_position = true;
-
+        physics_exts.need_add_gravity = true;
+        physics_exts.need_clamp = true;
         if (!sim_data.is_paused) {
-            
-            //physics_loop_naive_opencl();            
-            physics_loop_naive();
-            //physics_loop_naive_parallel();
-            
+            if (sim_read != NULL) {
+                gs_store_read_frame();
+            } else {
+                physics_loop_naive_opencl();            
+                //physics_loop_naive();
+                //physics_loop_naive_parallel();
 
-            // some methods may update position implicitly
-            if (physics_exts.need_recalc_position) {
-                physics_update_positions();
+                // universal gravity constant
+                if (physics_exts.need_add_gravity) physics_add_gravity();
+                // some methods may update position implicitly
+                if (physics_exts.need_recalc_position) physics_update_positions();
+                // keep them in a box
+                if (physics_exts.need_clamp) physics_clamp_positions();
             }
-
-            // keep them in a box
-            physics_clamp_positions();
         }
 
         ph_et = glfwGetTime();
 
-        particle_data._num_enabled = 0;
-        for (i = 0; i < n_particles; ++i) {
-            if (particle_data.is_enabled[i]) particle_data._num_enabled++;
+
+        if (do_show != 0) {
+            keep_going = sim_write != NULL || render_update();
         }
-
-        float rn_st = glfwGetTime(), rn_et;
-
-        keep_going = render_update();
-
-        rn_et = glfwGetTime();
 
         total_et = glfwGetTime();
 
-        GS_looptime = total_et - total_st;
+        if (L_time < 0.0f) {
+            GS_looptime = total_et - total_st;
+        } else {
+            GS_looptime = L_time;
+        }
 
         if (log_get_level() >= LOG_DEBUG) {
-            printf("loop time: %3.2f ms, phys time %3.2f ms", 1000.0 * GS_looptime, 1000.0 * (ph_et - ph_st));
+            printf("%d: loop time: %3.2f ms, phys time %3.2f ms", n_frames, 1000.0 * (total_et - total_st), 1000.0 * (ph_et - ph_st));
         }
 
         if (log_get_level() >= LOG_TRACE) {
@@ -192,7 +251,12 @@ int main(int argc, char ** argv) {
             printf("\n");
         }
         //log_trace("total time: %f ms (%f fps)", (et - st) / 1000.0, 1.0 / (et - st));
+        n_frames++;
     }
+
+
+    if (sim_write != NULL) gs_store_write_end();
+    if (sim_read != NULL) gs_store_read_end();
 
     return 0;
 }

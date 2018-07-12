@@ -3,8 +3,9 @@
 #include <pthread.h>
 
 
-#define NUM_THREADS 8
+#define NUM_THREADS 4
 
+vec4_t * forces_updates = NULL;
 pthread_t * tid = NULL;
 int * worker_id = NULL;
 
@@ -21,8 +22,8 @@ void * _sub_sec(void * worker_ptr) {
         vec4_t i_p = particle_data.P[i];
         
         int j;
-        for (j = 0; j < n_particles; ++j) {
-            if (j == i || !particle_data.is_enabled[j]) continue;
+        for (j = 0; j < i; ++j) {
+            if (!particle_data.is_enabled[j]) continue;
             vec4_t j_p = particle_data.P[j];
 
             // internal force calculation
@@ -30,6 +31,7 @@ void * _sub_sec(void * worker_ptr) {
 
             // add it directionally so they are attracted to the medium point
             particle_data.forces[i] = vec4_add(particle_data.forces[i], force);
+            forces_updates[worker * n_particles + j] = vec4_sub(forces_updates[worker * n_particles + j], force);
         }
     }
 
@@ -45,10 +47,15 @@ void physics_loop_naive_parallel() {
 
         worker_id = (int *)malloc(sizeof(int) * NUM_THREADS);
         tid = (pthread_t *)malloc(sizeof(pthread_t) * NUM_THREADS);
+        forces_updates = (vec4_t *)malloc(sizeof(vec4_t) * NUM_THREADS * n_particles);
     }
 
 
     int i;
+    for (i = 0; i < NUM_THREADS * n_particles; ++i) {
+        forces_updates[i] = V4(0.0, 0.0, 0.0, 0.0);
+    }
+
     for (i = 0; i < NUM_THREADS; ++i) {
         worker_id[i] = i;
         pthread_create(&tid[i], NULL, _sub_sec, (void *)&worker_id[i]);
@@ -56,6 +63,10 @@ void physics_loop_naive_parallel() {
 
     for (i = 0; i < NUM_THREADS; ++i) {
         pthread_join(tid[i], NULL);
+    }
+
+    for (i = 0; i < NUM_THREADS * n_particles; ++i) {
+        particle_data.forces[i % n_particles] = vec4_add(particle_data.forces[i % n_particles], forces_updates[i]);
     }
 }
 

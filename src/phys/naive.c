@@ -13,8 +13,8 @@ void physics_loop_naive() {
         vec4_t i_p = particle_data.P[i];
         
         int j;
-        for (j = 0; j < n_particles; ++j) {
-            if (i == j || !particle_data.is_enabled[j]) continue;
+        for (j = 0; j < i; ++j) {
+            if (!particle_data.is_enabled[j]) continue;
 
             vec4_t j_p = particle_data.P[j];
 
@@ -23,7 +23,7 @@ void physics_loop_naive() {
 
             // add it directionally so they are attracted to the medium point
             particle_data.forces[i] = vec4_add(particle_data.forces[i], force);
-            //particle_data.forces[j] = vec4_sub(particle_data.forces[j], force);
+            particle_data.forces[j] = vec4_sub(particle_data.forces[j], force);
         }
     }
 }

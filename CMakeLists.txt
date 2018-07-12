@@ -15,36 +15,14 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 
 
-if(APPLE)
-    set(OpenMP_C "${CMAKE_C_COMPILER}")
-    set(OpenMP_C_FLAGS "-fopenmp=libomp -Wno-unused-command-line-argument")
-    set(OpenMP_C_LIB_NAMES "libomp" "libgomp" "libiomp5")
-    set(OpenMP_libomp_LIBRARY ${OpenMP_C_LIB_NAMES})
-    set(OpenMP_libgomp_LIBRARY ${OpenMP_C_LIB_NAMES})
-    set(OpenMP_libiomp5_LIBRARY ${OpenMP_C_LIB_NAMES})
-endif()
-
-
-find_package(OpenMP REQUIRED)
-
-find_package(OpenCL REQUIRED)
-
-
-#message(STATUS "Hello There")
+find_package(OpenCL)
 
 
 set (CMAKE_C_FLAGS "-O3 -ffast-math -g -Wall -pedantic -std=c99 ${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 
 
-if (OpenMP_FOUND)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    add_definitions(-DHAVE_OPENMP)
-endif()
-
-
 if (OpenCL_FOUND)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenCL_LIBRARIES}")
     include_directories(${OpenCL_INCLUDE_DIRS})
     add_definitions(-DHAVE_OPENCL)
 endif()
