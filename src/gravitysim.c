@@ -162,8 +162,8 @@ int main(int argc, char ** argv) {
     particle_data.forces = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     particle_data.is_enabled = (bool *)malloc(sizeof(bool) * n_particles);
 
-    spawn_cluster(V4(50.0, 50.0, 0.0, 0.0), 0.0, 2000.0, 1);
-    spawn_cluster(V4(0.0, 0.0, 0.0, 0.0), 100.0, 12.0, n_particles-1);
+    spawn_cluster(V4(50.0, 50.0, 0.0, 0.0), 0.0, 1000.0, 1);
+    spawn_cluster(V4(0.0, 0.0, 0.0, 0.0), 100.0, 1.0, n_particles-1);
 
     sim_data.is_paused = false;//true;
 
@@ -210,8 +210,8 @@ int main(int argc, char ** argv) {
             if (sim_read != NULL) {
                 gs_store_read_frame();
             } else {
-                physics_loop_naive_cuda();            
-                //physics_loop_naive_opencl();            
+                //physics_loop_naive_cuda();            
+                physics_loop_naive_opencl();            
                 //physics_loop_naive();
                 //physics_loop_naive_parallel();
 

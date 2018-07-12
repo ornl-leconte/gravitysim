@@ -58,6 +58,7 @@ struct {
 
 void _cl_error_handle(char * file, int line) {
     printf("OpenCL error at %sL%d: %d\n", file, line, cl_env.err);
+    exit(1);
 }
 
 bool _plno_hasinit = false;
@@ -67,7 +68,7 @@ void physics_loop_naive_opencl() {
         // initialization code goes here
 
         CLCHK(clGetPlatformIDs(1, &cl_env.platform, NULL));
-        CLCHK(clGetDeviceIDs(cl_env.platform, CL_DEVICE_TYPE_CPU, 1, &cl_env.device, NULL));
+        CLCHK(clGetDeviceIDs(cl_env.platform, CL_DEVICE_TYPE_GPU, 1, &cl_env.device, NULL));
 
         size_t d_name_l, d_driver_l, d_version_l;
 
@@ -135,7 +136,7 @@ void physics_loop_naive_opencl() {
     CLCHK(clSetKernelArg(cl_env.kernel, 6, sizeof(cl_float), &cl_gravity_coef));
 
 
-    size_t local_size = 16;
+    size_t local_size = 256;
     size_t global_size = (n_particles / local_size + ((n_particles % local_size) != 0)) * local_size;
 
     //float st = (float)glfwGetTime(), et;

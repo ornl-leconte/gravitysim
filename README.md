@@ -10,7 +10,7 @@ Optionally:
 
 OpenCL (for faster physics computation)
 
-CUDA (for faster physics computation)
+CUDA (for faster physics computation) (use `cmake -DENABLE_CUDA=ON`)
 
 
 ## Maths

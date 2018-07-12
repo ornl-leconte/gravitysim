@@ -1,7 +1,15 @@
 cmake_minimum_required (VERSION 2.6)
 
+option(ENABLE_CUDA "enable cuda usage" OFF)
+
 SET(CMAKE_CUDA_COMPILER ${CMAKE_SOURCE_DIR}/my_nvcc)
-project (gravitysim LANGUAGES C CUDA)
+
+if (ENABLE_CUDA)
+    project (gravitysim LANGUAGES C CUDA)
+else()
+    project (gravitysim LANGUAGES C)
+endif()
+
 
 cmake_policy(SET CMP0017 OLD) 
 
@@ -19,11 +27,15 @@ find_package(glfw3 REQUIRED)
 
 find_package(OpenCL)
 
-find_package(CUDA)
+if (ENABLE_CUDA)
+    find_package(CUDA)
 
-if (CUDA_FOUND)
-    message(STATUS "using cuda")
-    add_definitions(-DHAVE_CUDA)
+    if (CUDA_FOUND)
+        message(STATUS "using cuda")
+        add_definitions(-DHAVE_CUDA)
+    else()
+        message("Wanted CUDA but couldn't find it")
+    endif()
 endif()
 
 
