@@ -17,7 +17,7 @@
 
 vec4_t universal_gravity = V4(0.0, 0.0, 0.0, 0.0);
 
-float gravity_coef = 9.81;
+float gravity_coef = 0.1;
 
 float GS_looptime = 0.0;
 
@@ -31,6 +31,14 @@ int i_p = 0;
 int n_frames;
 
 
+void spawn_particle(vec4_t part) {
+    particle_data.P[i_p] = part;
+    particle_data.forces[i_p] = V4(0.0, 0.0, 0.0, 0.0);
+    particle_data.velocities[i_p] = V4(0.0, 0.0, 0.0, 0.0);
+    particle_data.is_enabled[i_p] = true;
+    i_p++;
+}
+
 void spawn_cluster(vec4_t center, float rad, float mass, int n) {
 
     int i;
@@ -41,15 +49,11 @@ void spawn_cluster(vec4_t center, float rad, float mass, int n) {
         float trad = rad * random_float();
 
         vec4_t part;
-        part.x = trad * cosf(pitch) * cosf(y_rot);
-        part.y = trad * sinf(pitch);
-        part.z = trad * cosf(pitch) * sinf(y_rot);
+        part.x = center.x + trad * cosf(pitch) * cosf(y_rot);
+        part.y = center.y + trad * sinf(pitch);
+        part.z = center.z + trad * cosf(pitch) * sinf(y_rot);
         part.w = mass;
-        particle_data.P[i_p] = part;
-        particle_data.forces[i_p] = V4(0.0, 0.0, 0.0, 0.0);
-        particle_data.velocities[i_p] = V4(0.0, 0.0, 0.0, 0.0);
-        particle_data.is_enabled[i_p] = true;
-        i_p++;
+        spawn_particle(part);
     }
 }
 
@@ -61,6 +65,9 @@ int main(int argc, char ** argv) {
     win_width = 640;
     win_height = 480;
 
+    render_info.buffering = 1;
+
+
     bool do_show = true;
 
     float L_time = -1.0f;
@@ -71,7 +78,7 @@ int main(int argc, char ** argv) {
 
     char * sim_write = NULL, * sim_read = NULL;
 
-    while ((c = getopt(argc, argv, "n:v:S:w:G:F:O:I:L:Xh")) != (char)(-1)) switch (c) {
+    while ((c = getopt(argc, argv, "n:v:S:w:G:F:O:I:L:B:Xh")) != (char)(-1)) switch (c) {
         case 'h':
             printf("Usage: gravitysim [options]\n");
             printf("\n");
@@ -83,6 +90,7 @@ int main(int argc, char ** argv) {
             printf("  -F [f,f,f]        additional gravity vector\n");
             printf("  -X                this flag does no GUI (for baking computations)\n");
             printf("  -L [f]            fixed loop time (for baking computations)\n");
+            printf("  -B [n]            buffer swap (2+=buffering, 1=default, 0=no vsync)\n");
             printf("  -O [file]         store output into file\n");
             printf("  -I [file]         replay baked computation output from -O\n");
             printf("\n");
@@ -109,6 +117,9 @@ int main(int argc, char ** argv) {
             break;
         case 'L':
             sscanf(optarg, "%f", &L_time);
+            break;
+        case 'B':
+            sscanf(optarg, "%d", &render_info.buffering);
             break;
         case 'X':
             do_show = false;
@@ -162,13 +173,41 @@ int main(int argc, char ** argv) {
     particle_data.forces = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
     particle_data.is_enabled = (bool *)malloc(sizeof(bool) * n_particles);
 
-    spawn_cluster(V4(50.0, 50.0, 0.0, 0.0), 0.0, 1000.0, 1);
-    spawn_cluster(V4(0.0, 0.0, 0.0, 0.0), 100.0, 1.0, n_particles-1);
+
+    int i;
+    for (i = 0; i < n_particles; ++i) {
+        particle_data.is_enabled[i] = false;
+    }
+
+
+    //spawn_cluster(V4(50.0, 50.0, 0.0, 0.0), 50.0, 1000.0, 1);
+    //spawn_cluster(V4(-50.0, 50.0, 0.0, 0.0), 1.0, 100.0, 1);
+    //spawn_cluster(V4(50.0, -50.0, 0.0, 0.0), 20.0, 500.0, 1);
+    /*
+    spawn_cluster(V4(-10.0, -10.0, -10.0, 0.0), 1.0, 1.0, n_particles/4);
+    spawn_cluster(V4(-10.0, -10.0, 10.0, 0.0), 1.0, 1.0, n_particles/4);
+    spawn_cluster(V4(-10.0, 10.0, -10.0, 0.0), 1.0, 1.0, n_particles/4);
+    spawn_cluster(V4(-10.0, 10.0, 10.0, 0.0), 1.0, 1.0, n_particles/4);
+    */
+/*
+   int N = (int)cbrtf((float)n_particles);
+
+   for (i = 0; i < n_particles; ++i) {
+       float cx = 2.0f * fmod((float)i, (float)N) / N - 1.0f;
+       float cy = 2.0f * fmod((float)i / (float)N, (float)N) / N - 1.0f;
+       float cz = 2.0f * fmod((float)i / (float)(N*N), (float)N) / N - 1.0f;
+       spawn_particle(V4(100.0 * cx, 100.0 * cy, 100.0 * cz, 1.0));
+   }*/
+   /*
+    spawn_cluster(V4(10.0, 70.0, 50.0, 0.0), 10.0, 1.0, n_particles/4);
+    spawn_cluster(V4(-20.0, -50.0, 20.0, 0.0), 10.0, 1.0, n_particles/4);
+    spawn_cluster(V4(50.0, 30.0, -80.0, 0.0), 10.0, 1.0, n_particles/4);
+    spawn_cluster(V4(-90.0, -80.0, 0.0, 0.0), 10.0, 1.0, n_particles/4);
+*/
 
     sim_data.is_paused = false;//true;
 
     particle_data._num_enabled = 0;
-    int i;
     for (i = 0; i < n_particles; ++i) {
         if (particle_data.is_enabled[i]) particle_data._num_enabled++;
     }
@@ -176,7 +215,6 @@ int main(int argc, char ** argv) {
     n_frames = 0;
 
     physics_init();
-
 
     if (do_show != 0) {
         control_init();
@@ -205,20 +243,26 @@ int main(int argc, char ** argv) {
 
         physics_exts.need_recalc_position = true;
         physics_exts.need_add_gravity = true;
+        physics_exts.need_collision_handle = true;
         physics_exts.need_clamp = true;
+
         if (!sim_data.is_paused) {
             if (sim_read != NULL) {
                 gs_store_read_frame();
             } else {
-                physics_loop_naive_cuda();
+                //physics_loop_naive_cuda();
                 //physics_loop_naive_opencl();            
-                //physics_loop_naive();
+                physics_loop_naive();
                 //physics_loop_naive_parallel();
 
                 // universal gravity constant
                 if (physics_exts.need_add_gravity) physics_add_gravity();
+
+                if (physics_exts.need_collision_handle) physics_collision_handle();
+
                 // some methods may update position implicitly
                 if (physics_exts.need_recalc_position) physics_update_positions();
+
                 // keep them in a box
                 if (physics_exts.need_clamp) physics_clamp_positions();
             }

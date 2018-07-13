@@ -30,6 +30,10 @@ struct {
 
 int win_width, win_height;
 
+struct {
+    int buffering;
+} render_info;
+
 void render_init();
 
 void control_update();

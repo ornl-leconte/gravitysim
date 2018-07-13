@@ -158,7 +158,7 @@ void render_init() {
     glfwMakeContextCurrent(window);
 
 
-    glfwSwapInterval(0);
+    glfwSwapInterval(render_info.buffering);
 
     glfwGetWindowSize(window, &win_width, &win_height);
     glfwGetFramebufferSize(window, &vp_width, &vp_height);
@@ -512,6 +512,9 @@ bool render_update() {
 
     scene.floor_model = mat4_mul(translator(0.0, -100.0, 0.0), scaler(100.0, 100.0, 100.0));
     vec4_t center_pos = V4(0.0, 0.0, 0.0, 0.0);
+    //vec4_t center_pos = particle_data.P[0];
+    
+    center_pos.w = 0.0;
 
     scene.cam_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
     update_transform_matrix(scene.cam_pos, center_pos, V4(0.0, 0.0, 0.0, 0.0));
