@@ -213,6 +213,7 @@ void render_init() {
 
     float st = glfwGetTime(), et;
 
+
     prefabs.ico = load_obj("models/ico.obj");
     
     prefabs.cade = load_obj("models/cade.obj");
@@ -225,6 +226,7 @@ void render_init() {
     prefabs.particles.ico.Q_5 = load_obj("models/particle_ico_quality5.obj");
     prefabs.particles.ico.Q_6 = load_obj("models/particle_ico_quality6.obj");
     prefabs.particles.ico.Q_7 = load_obj("models/particle_ico_quality7.obj");
+
 
     prefabs.particles.special.blocky = load_obj("models/particle_blocky.obj");
     prefabs.particles.special.mememan = load_obj("models/particle_mememan.obj");

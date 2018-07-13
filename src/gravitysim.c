@@ -19,12 +19,12 @@ vec4_t universal_gravity = V4(0.0, 0.0, 0.0, 0.0);
 
 float gravity_coef = 9.81;
 
-// global particles array
-int n_particles;
-
 float GS_looptime = 0.0;
 
 char * shared_data_dir = NULL;
+
+// global particles array
+int n_particles;
 
 int i_p = 0;
 
@@ -210,8 +210,8 @@ int main(int argc, char ** argv) {
             if (sim_read != NULL) {
                 gs_store_read_frame();
             } else {
-                //physics_loop_naive_cuda();            
-                physics_loop_naive_opencl();            
+                physics_loop_naive_cuda();
+                //physics_loop_naive_opencl();            
                 //physics_loop_naive();
                 //physics_loop_naive_parallel();
 

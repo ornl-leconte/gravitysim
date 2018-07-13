@@ -148,9 +148,9 @@ typedef struct vec3_t {
 } vec3_t;
 
 model_t load_obj(char * _obj_path) {
-
     char * obj_path = malloc(strlen(shared_data_dir) + strlen(_obj_path) + 256);
     sprintf(obj_path, "%s/%s", shared_data_dir, _obj_path);
+
 
     model_t res;
 
