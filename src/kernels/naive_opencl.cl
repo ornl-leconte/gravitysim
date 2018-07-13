@@ -33,37 +33,24 @@ out_p : store updated particle info
 
 */
 
-__kernel void compute_system(__global float4 * in_p, __global float4 * g_vel, __global float4 * out_p, float4 uni_grav, int n_particles, float dt, float G_const) {
+__kernel void compute_system(int N, float dt, float G, __global float4 * in_P, __global float4 * g_V, __global float4 * out_P) {
 
   int i = get_global_id(0), j;
-  if (i >= n_particles) return;
-  float4 t_force = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-  float4 my_p = in_p[i], my_vel = g_vel[i];
-  float my_size = mass_to_size(my_p.w);
+  if (i >= N) return;
+  float4 F = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+  float4 P = in_P[i], V = g_V[i];
+  float my_size = mass_to_size(P.w);
   
-  for (j = 0; j < n_particles; ++j) {
+  for (j = 0; j < N; ++j) {
     if (i != j) {
-      t_force += force_calc(my_p, in_p[j], G_const); //
+      F += force_calc(P, in_P[j], G); //
     }
   }
-  
-  t_force += uni_grav;
 
-  // update relevant stuff
-  float4 new_vel = my_vel + t_force * (dt / my_p.w);
-  float4 new_pos = my_p + (dt) * new_vel;
-  
+  V = V + F * (dt / P.w);
+  P = P + V * (dt);
 
-  // clamping code
-  if (new_pos.x + my_size > 100.0f) new_pos.x = 100.0f - my_size;
-  if (new_pos.y + my_size > 100.0f) new_pos.y = 100.0f - my_size;
-  if (new_pos.z + my_size > 100.0f) new_pos.z = 100.0f - my_size;
-
-  if (new_pos.x - my_size < -100.0f) new_pos.x = my_size - 100.0f;
-  if (new_pos.y - my_size < -100.0f) new_pos.y = my_size - 100.0f;
-  if (new_pos.z - my_size < -100.0f) new_pos.z = my_size - 100.0f;
-
-  out_p[i] = new_pos;
-  g_vel[i] = new_vel;
+  out_P[i] = P;
+  g_V[i] = V;
 }
 

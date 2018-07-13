@@ -43,15 +43,18 @@ struct {
 
 struct {
 
+    // used so we know if we need to realloc
+    int _N;
+
+
     // 4 * sizeof(float) * n_particles packed of (x, y, z, mass)
-    cl_mem in_p;
-    
+    cl_mem in_P;    
 
     // 4 * sizeof(float) * n_particles packed of (x, y, z, _), should be read and written to
-    cl_mem g_vel;
+    cl_mem g_V;
 
     // 4 * sizeof(float) * n_particles packed of (x, y, z, _) force vectors for the corresponding particle (fourth is left just for packing reasons)
-    cl_mem out_p;
+    cl_mem out_P;
 
 } cl_data;
 
@@ -68,7 +71,7 @@ void physics_loop_naive_opencl() {
         // initialization code goes here
 
         CLCHK(clGetPlatformIDs(1, &cl_env.platform, NULL));
-        CLCHK(clGetDeviceIDs(cl_env.platform, CL_DEVICE_TYPE_GPU, 1, &cl_env.device, NULL));
+        CLCHK(clGetDeviceIDs(cl_env.platform, CL_DEVICE_TYPE_CPU, 1, &cl_env.device, NULL));
 
         size_t d_name_l, d_driver_l, d_version_l;
 
@@ -102,42 +105,55 @@ void physics_loop_naive_opencl() {
 
         CLCHK_NOSET(cl_env.kernel = clCreateKernel(cl_env.program, "compute_system", &cl_env.err));
 
-        CLCHK_NOSET(cl_data.in_p = clCreateBuffer(cl_env.context, CL_MEM_READ_ONLY, sizeof(vec4_t) * n_particles, NULL, &cl_env.err));
+        cl_data._N = GS.N;
+
+        CLCHK_NOSET(cl_data.in_P = clCreateBuffer(cl_env.context, CL_MEM_READ_ONLY, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
         //CLCHK_NOSET(cl_data.g_vel = clCreateBuffer(cl_env.context, CL_MEM_READ_WRITE, sizeof(vec4_t) * n_particles, NULL, &cl_env.err));
-        CLCHK_NOSET(cl_data.g_vel = clCreateBuffer(cl_env.context, CL_MEM_READ_WRITE, sizeof(vec4_t) * n_particles, NULL, &cl_env.err));
-        CLCHK_NOSET(cl_data.out_p = clCreateBuffer(cl_env.context, CL_MEM_WRITE_ONLY, sizeof(vec4_t) * n_particles, NULL, &cl_env.err));
+        CLCHK_NOSET(cl_data.g_V = clCreateBuffer(cl_env.context, CL_MEM_READ_WRITE, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
+        CLCHK_NOSET(cl_data.out_P = clCreateBuffer(cl_env.context, CL_MEM_WRITE_ONLY, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
 
         log_info("OpenCL has initialized");
         _plno_hasinit = true;
+    } else if (GS.N > cl_data._N) {
+        log_trace("OpenCL reallocing");
+
+        // need to realloc the stuff
+        CLCHK_NOSET(clReleaseMemObject(cl_data.in_P));
+        CLCHK_NOSET(clReleaseMemObject(cl_data.g_V));
+        CLCHK_NOSET(clReleaseMemObject(cl_data.out_P));
+
+        cl_data._N = GS.N;
+
+        CLCHK_NOSET(cl_data.in_P = clCreateBuffer(cl_env.context, CL_MEM_READ_ONLY, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
+        //CLCHK_NOSET(cl_data.g_vel = clCreateBuffer(cl_env.context, CL_MEM_READ_WRITE, sizeof(vec4_t) * n_particles, NULL, &cl_env.err));
+        CLCHK_NOSET(cl_data.g_V = clCreateBuffer(cl_env.context, CL_MEM_READ_WRITE, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
+        CLCHK_NOSET(cl_data.out_P = clCreateBuffer(cl_env.context, CL_MEM_WRITE_ONLY, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
+
     }
+
     // this means we have to
+    physics_exts.need_collision_handle = true;
     physics_exts.need_recalc_position = false;
-    physics_exts.need_add_gravity = false;
-    physics_exts.need_clamp = false;
+    physics_exts.need_clamp = true;
 
-    CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.in_p, CL_TRUE, 0, sizeof(vec4_t) * n_particles, particle_data.P, 0, NULL, NULL));
+    CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.in_P, CL_TRUE, 0, sizeof(vec4_t) * GS.N, GS.P, 0, NULL, NULL));
 
-    CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.g_vel, CL_TRUE, 0, sizeof(vec4_t) * n_particles, particle_data.velocities, 0, NULL, NULL));
+    CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.g_V, CL_TRUE, 0, sizeof(vec4_t) * GS.N, GS.V, 0, NULL, NULL));
 
-    cl_int cl_n_particles = n_particles;
-    cl_float cl_gravity_coef = gravity_coef;
-    cl_float cl_dt = GS_looptime;
-    cl_float4 cl_uni_gravity;
-    cl_uni_gravity.s[0] = universal_gravity.x;
-    cl_uni_gravity.s[1] = universal_gravity.y;
-    cl_uni_gravity.s[2] = universal_gravity.z;
+    cl_int cl_N = GS.N;
+    cl_float cl_G = GS.G;
+    cl_float cl_dt = GS.dt;
 
-    CLCHK(clSetKernelArg(cl_env.kernel, 0, sizeof(cl_mem), &cl_data.in_p));
-    CLCHK(clSetKernelArg(cl_env.kernel, 1, sizeof(cl_mem), &cl_data.g_vel));
-    CLCHK(clSetKernelArg(cl_env.kernel, 2, sizeof(cl_mem), &cl_data.out_p));
-    CLCHK(clSetKernelArg(cl_env.kernel, 3, sizeof(cl_float4), &cl_uni_gravity));
-    CLCHK(clSetKernelArg(cl_env.kernel, 4, sizeof(cl_int), &cl_n_particles));
-    CLCHK(clSetKernelArg(cl_env.kernel, 5, sizeof(cl_float), &cl_dt));
-    CLCHK(clSetKernelArg(cl_env.kernel, 6, sizeof(cl_float), &cl_gravity_coef));
+    CLCHK(clSetKernelArg(cl_env.kernel, 0, sizeof(cl_int), &cl_N));
+    CLCHK(clSetKernelArg(cl_env.kernel, 1, sizeof(cl_float), &cl_dt));
+    CLCHK(clSetKernelArg(cl_env.kernel, 2, sizeof(cl_float), &cl_G));
+    CLCHK(clSetKernelArg(cl_env.kernel, 3, sizeof(cl_mem), &cl_data.in_P));
+    CLCHK(clSetKernelArg(cl_env.kernel, 4, sizeof(cl_mem), &cl_data.g_V));
+    CLCHK(clSetKernelArg(cl_env.kernel, 5, sizeof(cl_mem), &cl_data.out_P));
 
 
-    size_t local_size = 256;
-    size_t global_size = (n_particles / local_size + ((n_particles % local_size) != 0)) * local_size;
+    size_t local_size = 16;
+    size_t global_size = (cl_N / local_size + ((cl_N % local_size) != 0)) * local_size;
 
     //float st = (float)glfwGetTime(), et;
 
@@ -148,9 +164,9 @@ void physics_loop_naive_opencl() {
     // log kernel time
     //printf("kernel: %f ms\n", 1000.0 * (et - st));
 
-    CLCHK(clEnqueueReadBuffer(cl_env.queue, cl_data.out_p, CL_TRUE, 0, sizeof(vec4_t) * n_particles, particle_data.P, 0, NULL, NULL));
+    CLCHK(clEnqueueReadBuffer(cl_env.queue, cl_data.out_P, CL_TRUE, 0, sizeof(vec4_t) * GS.N, GS.P, 0, NULL, NULL));
 
-    CLCHK(clEnqueueReadBuffer(cl_env.queue, cl_data.g_vel, CL_TRUE, 0, sizeof(vec4_t) * n_particles, particle_data.velocities, 0, NULL, NULL));
+    CLCHK(clEnqueueReadBuffer(cl_env.queue, cl_data.g_V, CL_TRUE, 0, sizeof(vec4_t) * GS.N, GS.V, 0, NULL, NULL));
     
 }
 

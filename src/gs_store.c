@@ -17,12 +17,10 @@ void gs_store_write_init(char * file_path) {
 }
 
 void gs_store_write_frame() {
-    if (n_written == 0) {
-        // write first metadata
-        fwrite(&n_particles, sizeof(n_particles), 1, fp_write);
-    }
+    // write metadata
+    fwrite(&GS.N, sizeof(GS.N), 1, fp_write);
 
-    fwrite(particle_data.P, sizeof(vec4_t), n_particles, fp_write);
+    fwrite(GS.P, sizeof(vec4_t), GS.N, fp_write);
 
     n_written++;
 }
@@ -38,16 +36,15 @@ void gs_store_read_init(char * file_path) {
         log_error("ERROR opening storage file: '%s'", file_path);
         exit(1);
     }
-    
-    // read header library
-    fread(&n_particles, sizeof(n_particles), 1, fp_read);
-    
+
     n_read = 0;
 }
 
 
 void gs_store_read_frame() {
-    fread(particle_data.P, sizeof(vec4_t), n_particles, fp_read);
+    fread(GS.N, sizeof(GS.N), 1, fp_read);
+    update_N(GS.N);
+    fread(GS.P, sizeof(vec4_t), GS.N, fp_read);
 
     if (feof(fp_read)) log_info("done with animation");
 

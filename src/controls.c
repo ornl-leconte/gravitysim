@@ -33,7 +33,7 @@ bool is_pressed(int k) {
 
 void control_update() {
     // will be 1.0 at perfect 60.0 fps
-    float cm = GS_looptime * 60.0;
+    float cm = GS.dt * 60.0;
     glfwSetInputMode(window, GLFW_STICKY_KEYS, 1);
 
     // do update for all sorts of controllers 
@@ -47,7 +47,7 @@ void control_update() {
     if (is_pressed(GLFW_KEY_PERIOD)) scene.cam_fov += M_PI * 0.15 * (cm / 60.0);
     if (is_pressed(GLFW_KEY_COMMA)) scene.cam_fov -= M_PI * 0.15 * (cm / 60.0);
 
-    if (pressed_once(GLFW_KEY_P)) sim_data.is_paused = !sim_data.is_paused;
+    if (pressed_once(GLFW_KEY_P)) GS.is_paused = !GS.is_paused;
 
 
     if (scene.cam_pitch > M_PI / 2) scene.cam_pitch = M_PI / 2 - 0.01;

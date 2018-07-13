@@ -21,8 +21,6 @@ struct {
     
     bool need_recalc_position;
 
-    bool need_add_gravity;
-
     bool need_collision_handle;
 
     bool need_clamp;
@@ -32,7 +30,6 @@ struct {
 void physics_init();
 
 
-void physics_add_gravity();
 void physics_update_positions();
 void physics_collision_handle();
 void physics_clamp_positions();

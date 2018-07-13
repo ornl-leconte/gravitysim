@@ -18,15 +18,8 @@
 #include <string.h>
 #include <math.h>
 
-int win_width, win_height;
-
-int vp_width, vp_height;    
-
 
 GLFWwindow *window = NULL;
-
-int n_frames = 0;
-
 
 // stores texture IDs
 struct {
@@ -59,8 +52,6 @@ struct {
 // struct to sort and apply different qualities/models;
 struct {
 
-    float * qual;
-
     vec4_t * sorted_particles;
 
     GLuint vbo;
@@ -69,8 +60,6 @@ struct {
     vec4_t * Q_1, * Q_2, * Q_3, * Q_4, * Q_5, * Q_6, * Q_7;
 
 } render_div;
-
-
 
 
 // all shader programs
@@ -93,7 +82,6 @@ struct {
     mat4_t viewproj;
 
 } transformations;
-
 
 
 
@@ -133,7 +121,7 @@ void render_init() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
-    bool fullscreen = win_width == 0 || win_height == 0;
+    bool fullscreen = render.win_width == 0 || render.win_height == 0;
     if (fullscreen) {
 
         const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
@@ -158,10 +146,10 @@ void render_init() {
     glfwMakeContextCurrent(window);
 
 
-    glfwSwapInterval(render_info.buffering);
+    glfwSwapInterval(render.buffering);
 
-    glfwGetWindowSize(window, &win_width, &win_height);
-    glfwGetFramebufferSize(window, &vp_width, &vp_height);
+    glfwGetWindowSize(window, &render.win_width, &render.win_height);
+    glfwGetFramebufferSize(window, &render.vp_width, &render.vp_height);
 
     // for some reason we need this to be set
     glewExperimental = 1;   
@@ -171,42 +159,30 @@ void render_init() {
         exit(1);                      
     }
 
-    glViewport(0, 0, vp_width, vp_height);
+    glViewport(0, 0, render.vp_width, render.vp_height);
 
     log_info("OpenGL version: %s", glGetString(GL_VERSION));
 
     log_info("OpenGL renderer: %s", glGetString(GL_RENDERER));
     
-    
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
 
     scene.cam_period = 0.0;
     scene.cam_pitch = M_PI / 4.0;
     scene.cam_dist = 250.0;
     scene.cam_fov = M_PI / 4.0;
 
-
-    
-
     /* basic opengl settings */
     // Set the viewport to cover the new window
-    glfwGetFramebufferSize(window, &vp_width, &vp_height);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
 
-	glDepthFunc(GL_LESS); 
-
-    //wireframe mode
+    // set this to enable wireframe mode
     //glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-    // might need to transpose
-    //dump_mat4(view);
 
-/*
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-*/
-    /* model creation */
 
+
+    // vertex buffer that is reused for each
     glGenBuffers(1, &render_div.vbo);
 
     /* load objects */
@@ -250,15 +226,15 @@ void render_init() {
 
     /* for distance changing */
 
-    render_div.qual = (float *)malloc(sizeof(float) * n_particles);
-    render_div.sorted_particles = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_1 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_2 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_3 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_4 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_5 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_6 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
-    render_div.Q_7 = (vec4_t *)malloc(sizeof(vec4_t) * n_particles);
+    // these are realloc'd each time, because the number of particles might change
+    render_div.sorted_particles = NULL;
+    render_div.Q_1 = NULL;
+    render_div.Q_2 = NULL;
+    render_div.Q_3 = NULL;
+    render_div.Q_4 = NULL;
+    render_div.Q_5 = NULL;
+    render_div.Q_6 = NULL;
+    render_div.Q_7 = NULL;
 
 
     GLCHK
@@ -266,30 +242,17 @@ void render_init() {
     log_info("render init done");
 }
 
-
 void update_transform_matrix(vec4_t camera_pos, vec4_t towards, vec4_t rot) {
-
-    // identity
-    //mat4_t model = MAT4_I;
-
-    transformations.model = mat4_mul(MAT4_I, scaler(1.0, 1.0, 1.0));
-
+    // don't do anything to models, use identity matrix
+    transformations.model = MAT4_I;
 
     // apply transformations, rotations, etc on model vertexes here
-
-    mat4_t proj = perspective(scene.cam_fov, (float)win_width / (float)win_height, 0.01f, 1000.0f);
-
+    // these are used by helper functions in gs_math and ccgl
+    mat4_t proj = perspective(scene.cam_fov, (float)render.win_width / (float)render.win_height, 0.01f, 1000.0f);
     mat4_t view = look_at(camera_pos, towards, V4(0.0, 1.0, 0.0, 0.0));
 
-    //mvp = mat4_mul(proj, view);
-   // mvp = mat4_mul(mvp, model);
-   transformations.viewproj = mat4_mul(proj, view);
-
-
-    //dump_mat4(mvp);
-
-   // mvp.v[3][3] = 1.0;
-
+    // bake these together
+    transformations.viewproj = mat4_mul(proj, view);
 }
 
 void render_model(model_t model) {
@@ -304,7 +267,7 @@ void render_model(model_t model) {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
     // Draw the triangle !
-    glDrawArrays(GL_TRIANGLES, 0, model.vbo_num); // Starting from vertex 0; 3 vertices total -> 1 triangle
+    glDrawArrays(GL_TRIANGLES, 0, model.vbo_num); 
 }
 
 void _floor_render() {
@@ -323,45 +286,22 @@ void _floor_render() {
     glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
 
     render_model(prefabs.plane);
-
 }
 
-void _basic_render() {
 
-    glUseProgram(shaders.basic);
-
-    int model_tr = glGetUniformLocation(shaders.basic, "uni_model_tr");
-    int viewproj_tr = glGetUniformLocation(shaders.basic, "uni_viewproj_tr");
-
-    int lightpos = glGetUniformLocation(shaders.basic, "uni_lightpos");
-
-    if (!(model_tr >= 0 && viewproj_tr >= 0 && lightpos >= 0)) {
-        printf("error finding transformation shader positions\n");
-        exit(1);
-    }
-
-    glUniformMatrix4fv(model_tr, 1, GL_TRUE, &(transformations.model.v[0][0]));
-    glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
-    glUniform3f(lightpos, scene.light_pos.x, scene.light_pos.y, scene.light_pos.z);
-
-
-    /* render models */
-    render_model(prefabs.cade);
-    //render_model(prefabs.ico);
-}
-
-// method to just assign all to Q4
-void sort_particles_allQ2() {
+// method to just assign all to Q2
+void assign_particles_ALLQ2() {
     render_div.Q_1_len = 0;
-    render_div.Q_2_len = n_particles;
+    render_div.Q_2_len = GS.N;
     render_div.Q_3_len = 0;
     render_div.Q_4_len = 0;
     render_div.Q_5_len = 0;
     render_div.Q_6_len = 0;
     render_div.Q_7_len = 0;
-    memcpy(render_div.Q_2, particle_data.P, sizeof(vec4_t) * n_particles);
+    memcpy(render_div.Q_2, GS.P, sizeof(vec4_t) * GS.N);
 }
 
+// comparison particles
 int particle_comp(void * _a, void * _b) {
     vec4_t a = *(vec4_t *)_a, b = *(vec4_t *)_b;
     float dx = scene.cam_pos.x - a.x;
@@ -385,7 +325,7 @@ int particle_comp(void * _a, void * _b) {
     }
 }
 
-void sort_particles() {
+void assign_particles_ORDERED() {
     render_div.Q_1_len = 0;
     render_div.Q_2_len = 0;
     render_div.Q_3_len = 0;
@@ -395,33 +335,33 @@ void sort_particles() {
     render_div.Q_7_len = 0;
 
 
-    memcpy(render_div.sorted_particles, particle_data.P, n_particles * sizeof(vec4_t));
+    memcpy(render_div.sorted_particles, GS.P, sizeof(vec4_t) * GS.N);
 
-    qsort(render_div.sorted_particles, n_particles, sizeof(vec4_t), particle_comp);
+    qsort(render_div.sorted_particles, GS.N, sizeof(vec4_t), particle_comp);
 
 
     int i;
-    for (i = 0; i < n_particles; ++i) {
+    for (i = 0; i < GS.N; ++i) {
         // use a really high quality sphere if it's so close
         // but only render 4 of these max
         vec4_t ca = render_div.sorted_particles[i];
-        if (render_div.Q_7_len < 4 && n_particles <= 1024) {
+        if (render_div.Q_7_len < 4 && GS.N <= 1024) {
             render_div.Q_7[render_div.Q_7_len++] = ca;
-        } else if (render_div.Q_6_len < 10 && n_particles <= 2048) {
+        } else if (render_div.Q_6_len < 10 && GS.N <= 2048) {
             render_div.Q_6[render_div.Q_6_len++] = ca;
-        } else if (render_div.Q_5_len < 0.04 * n_particles && n_particles <= 4096) {
+        } else if (render_div.Q_5_len < 0.04 * GS.N && GS.N <= 4096) {
             render_div.Q_5[render_div.Q_5_len++] = ca;
-        } else if (render_div.Q_4_len < 0.10 * n_particles && n_particles <= 8196) {
+        } else if (render_div.Q_4_len < 0.10 * GS.N && GS.N <= 8196) {
             render_div.Q_4[render_div.Q_4_len++] = ca;
-        } else if (render_div.Q_3_len < 0.25 * n_particles && n_particles <= 16384) {
+        } else if (render_div.Q_3_len < 0.25 * GS.N && GS.N <= 16384) {
             render_div.Q_3[render_div.Q_3_len++] = ca;
-        } else if (render_div.Q_3_len < 0.35 * n_particles) {
+        } else if (render_div.Q_3_len < 0.35 * GS.N) {
             render_div.Q_2[render_div.Q_2_len++] = ca;
         } else {
             render_div.Q_1[render_div.Q_1_len++] = ca;
         }
     }
-    //printf("Q2:%lf,Q3:%lf,Q4:%lf,Q5:%lf,Q6:%lf,Q7:%lf\n", (float)render_div.Q_2_len/n_particles, (float)render_div.Q_3_len/n_particles, (float)render_div.Q_4_len/n_particles, (float)render_div.Q_5_len/n_particles, (float)render_div.Q_6_len/n_particles, (float)render_div.Q_7_len/n_particles);
+    //printf("Q2:%lf,Q3:%lf,Q4:%lf,Q5:%lf,Q6:%lf,Q7:%lf\n", (float)render_div.Q_2_len/GS.N, (float)render_div.Q_3_len/GS.N, (float)render_div.Q_4_len/GS.N, (float)render_div.Q_5_len/GS.N, (float)render_div.Q_6_len/GS.N, (float)render_div.Q_7_len/GS.N);
 }
 
 void _render_particles_pass(model_t cur_Q, vec4_t * _parts, int _parts_len) {
@@ -477,7 +417,18 @@ void render_particles() {
     // optimized for close particles beinghigher quality
     if (true) {
         // multipass render
-        sort_particles();
+        render_div.sorted_particles = (vec4_t *)realloc((void *)render_div.sorted_particles, sizeof(vec4_t) * GS.N);
+
+        render_div.Q_1 = (vec4_t *)realloc((void *)render_div.Q_1, sizeof(vec4_t) * GS.N);
+        render_div.Q_2 = (vec4_t *)realloc((void *)render_div.Q_2, sizeof(vec4_t) * GS.N);
+        render_div.Q_3 = (vec4_t *)realloc((void *)render_div.Q_3, sizeof(vec4_t) * GS.N);
+        render_div.Q_4 = (vec4_t *)realloc((void *)render_div.Q_4, sizeof(vec4_t) * GS.N);
+        render_div.Q_5 = (vec4_t *)realloc((void *)render_div.Q_5, sizeof(vec4_t) * GS.N);
+        render_div.Q_6 = (vec4_t *)realloc((void *)render_div.Q_6, sizeof(vec4_t) * GS.N);
+        render_div.Q_7 = (vec4_t *)realloc((void *)render_div.Q_7, sizeof(vec4_t) * GS.N);
+
+        assign_particles_ORDERED();
+
         _render_particles_pass(prefabs.particles.ico.Q_1, render_div.Q_1, render_div.Q_1_len);
         _render_particles_pass(prefabs.particles.ico.Q_2, render_div.Q_2, render_div.Q_2_len);
         _render_particles_pass(prefabs.particles.ico.Q_3, render_div.Q_3, render_div.Q_3_len);
@@ -486,9 +437,9 @@ void render_particles() {
         _render_particles_pass(prefabs.particles.ico.Q_6, render_div.Q_6, render_div.Q_6_len);
         _render_particles_pass(prefabs.particles.ico.Q_7, render_div.Q_7, render_div.Q_7_len);
     } else {
-        _render_particles_pass(prefabs.particles.ico.Q_1, particle_data.P, n_particles);
-        //_render_particles_pass(prefabs.particles.special.blocky, particle_data.P, n_particles);
-        //_render_particles_pass(prefabs.particles.special.mememan, particle_data.P, n_particles);
+        _render_particles_pass(prefabs.particles.ico.Q_1, GS.P, GS.N);
+        //_render_particles_pass(prefabs.particles.special.blocky, particle_data.P, GS.N);
+        //_render_particles_pass(prefabs.particles.special.mememan, particle_data.P, GS.N);
     }
 
 }
@@ -500,30 +451,19 @@ bool render_update() {
     }
 
     /* frame init */
-
     // account for changes
-    glfwGetWindowSize(window, &win_width, &win_height);
-    glfwGetFramebufferSize(window, &vp_width, &vp_height);
-    glViewport(0, 0, vp_width, vp_height);
-
-    // will probably need to smooth this
-    //float dist = 50.0 + 120.0 * powf((physics_data.std_pos.x + physics_data.std_pos.y + physics_data.std_pos.z) / 3.0, 0.4);
+    glfwGetWindowSize(window, &render.win_width, &render.win_height);
+    glfwGetFramebufferSize(window, &render.vp_width, &render.vp_height);
+    glViewport(0, 0, render.vp_width, render.vp_height);
 
 
     scene.floor_model = mat4_mul(translator(0.0, -100.0, 0.0), scaler(100.0, 100.0, 100.0));
     vec4_t center_pos = V4(0.0, 0.0, 0.0, 0.0);
-    //vec4_t center_pos = particle_data.P[0];
-    
-    center_pos.w = 0.0;
 
     scene.cam_pos = camera_orbit(center_pos, scene.cam_dist, scene.cam_period, scene.cam_pitch);
     update_transform_matrix(scene.cam_pos, center_pos, V4(0.0, 0.0, 0.0, 0.0));
 
-    
-
     scene.light_pos = scene.cam_pos;
-
-   // scene.light_pos = V3(0.0, 0.0, 0.0);
 
 
     glClearColor(0.2f, 0.0f, 0.8f, 1.0f);
@@ -534,15 +474,10 @@ bool render_update() {
 
     /* draw the stuff */
 
-    
-
     _floor_render();
-    //_basic_render();
-    //_inst_render();
-    
+
     render_particles();
 
-    
     /* boiler plate stuff */
 
     glfwSwapBuffers(window);

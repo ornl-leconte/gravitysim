@@ -28,11 +28,20 @@ struct {
 
 } scene;
 
-int win_width, win_height;
 
 struct {
+    // window size
+    int win_width, win_height;
+
+    // viewport size
+    int vp_width, vp_height;
+
+    // frame buffer length, 0 = no vsync, 1 = vsync, others are extra buffering
     int buffering;
-} render_info;
+
+    bool show;
+
+} render;
 
 void render_init();
 
