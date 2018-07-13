@@ -26,11 +26,10 @@ void update_N(int N) {
     GS.P = (vec4_t *)realloc(GS.P, sizeof(vec4_t) * N);
 }
 
-
-void spawn_particle(vec4_t part) {
+void spawn_particle(vec4_t part, vec4_t vel) {
     update_N(GS.N+1);
     GS.F[GS.N-1] = V4(0.0, 0.0, 0.0, 0.0);
-    GS.V[GS.N-1] = V4(0.0, 0.0, 0.0, 0.0);
+    GS.V[GS.N-1] = vel;
     GS.P[GS.N-1] = part;
 }
 
@@ -41,8 +40,70 @@ void spawn_cluster(vec4_t base, float size, int N) {
         part.x += (random_float() - 0.5) * size;
         part.y += (random_float() - 0.5) * size;
         part.z += (random_float() - 0.5) * size;
-        spawn_particle(part);
+        spawn_particle(part, V4(0.0, 0.0, 0.0, 0.0));
     }
+}
+
+
+
+void run_generator(char * file_path) {
+
+    FILE * fp = fopen(file_path, "r");
+    if (fp == NULL) {
+        printf("ERROR opening generator file '%s'\n", file_path);
+        exit(1);
+    }
+
+    char cur_func[256];
+    char cur_args[4096];
+
+    while (!feof(fp)) {
+        int r = fscanf(fp, "%s ", cur_func);
+        if (r != 1) {
+            continue;
+        }
+
+        fgets(cur_args, 4096, fp);
+
+        if (strcmp(cur_func, "p") == 0) {
+            vec4_t part, vel;
+            if (7 == sscanf(cur_args, "%f,%f,%f %f %f,%f,%f\n", &part.x, &part.y, &part.z, &part.w, &vel.x, &vel.y, &vel.z)) {
+                spawn_particle(part, vel);
+            } else if (4 == sscanf(cur_args, "%f,%f,%f %f\n", &part.x, &part.y, &part.z, &part.w)) {
+                spawn_particle(part, V4(0.0, 0.0, 0.0, 0.0));
+            } else if (3 == sscanf(cur_args, "%f,%f,%f\n", &part.x, &part.y, &part.z)) {
+                part.w = 1.0;
+                spawn_particle(part, V4(0.0, 0.0, 0.0, 0.0));
+            } else {
+                printf("ERROR: func 'p': couldn't find any valid argument combinations\n");
+                exit(1);
+            }
+        } else if (strcmp(cur_func, "g") == 0) {
+            vec4_t start, end, num;
+            float mass;
+            if (10 == sscanf(cur_args, "%f,%f,%f %f,%f,%f %f,%f,%f %f\n", &start.x, &start.y, &start.z, &end.x, &end.y, &end.z, &num.x, &num.y, &num.z, &mass)) {
+            } else if (9 == sscanf(cur_args, "%f,%f,%f %f,%f,%f %f,%f,%f\n", &start.x, &start.y, &start.z, &end.x, &end.y, &end.z, &num.x, &num.y, &num.z)) {
+                mass = 1.0f;
+            } else {
+                printf("ERROR: func 'g': couldn't find any valid argument combinations\n");
+            }
+
+            int nX = (int)floor(num.x+0.5), nY = (int)floor(num.y+0.5), nZ = (int)floor(num.x+0.5);
+            float fx, fy, fz;
+            for (fx = start.x; fx < end.x; fx += (end.x - start.x) / nX)
+            for (fy = start.y; fy < end.y; fy += (end.y - start.y) / nY)
+            for (fz = start.z; fz < end.z; fz += (end.z - start.z) / nZ) {
+                spawn_particle(V4(fx, fy, fz, mass), V4(0.0, 0.0, 0.0, 0.0));
+            }
+
+        } else if (strlen(cur_func) >= 1 && cur_func[0] == '#') {
+            // comment
+            continue;
+        } else {
+            printf("ERROR: unknown function: '%s'\n", cur_func);
+        }
+    }
+
 }
 
 
@@ -62,13 +123,14 @@ int main(int argc, char ** argv) {
     GS.coll_B = 12.0f;
     GS.dt = 1.0f / 60.0f;
     GS.tt = 0.0f;
+    GS.N = 0;
 
     shared_data_dir = ".";
 
     char * sim_write = NULL, * sim_read = NULL;
 
     char c;
-    while ((c = getopt(argc, argv, "N:v:S:w:G:B:O:I:L:b:Xh")) != (char)(-1)) switch (c) {
+    while ((c = getopt(argc, argv, "N:f:v:S:w:G:B:O:I:L:b:XPh")) != (char)(-1)) switch (c) {
         case 'h':
             printf("Usage: gravitysim [options]\n");
             printf("\n");
@@ -76,10 +138,12 @@ int main(int argc, char ** argv) {
             printf("  -v [N]            sets verbosity (5=EVERYTHING, 1=ERRORS ONLY)\n");
             printf("  -S [dir]          sets the shared directory (${SHARED_DIR}/src should be where most stuff is stored)\n");
             printf("  -w [WxH]          width and height of window (0 for either for fullscreen)\n");
+            printf("  -f [file]         run a generator file\n");
             printf("  -N [N]            set number of particles\n");
             printf("  -G [f]            gravitation constant\n");
             printf("  -B [f]            beta collision factor\n");
             printf("  -X                this flag does no GUI (for baking computations)\n");
+            printf("  -P                begin the simulation paused\n");
             printf("  -L [f]            fixed loop time (for baking computations)\n");
             printf("  -b [n]            buffer swap (2+=buffering, 1=default, 0=no vsync)\n");
             printf("  -O [file]         store output into file\n");
@@ -100,6 +164,9 @@ int main(int argc, char ** argv) {
         case 'N':
             sscanf(optarg, "%d", &GS.N);
             break;
+        case 'f':
+            run_generator(optarg);
+            break;            
         case 'G':
             sscanf(optarg, "%f", &GS.G);
             break;
@@ -114,6 +181,9 @@ int main(int argc, char ** argv) {
             break;
         case 'X':
             render.show = false;
+            break;
+        case 'P':
+            GS.is_paused = true;
             break;
         case 'O':
             sim_write = strdup(optarg);
@@ -158,7 +228,7 @@ int main(int argc, char ** argv) {
     }
 
 
-    spawn_cluster(V4(0.0, 0.0, 0.0, 1.0), 100.0, 1024);
+    //spawn_cluster(V4(0.0, 0.0, 0.0, 1.0), 100.0, 1024);
 
     log_info("number of particles: %d", GS.N);
 

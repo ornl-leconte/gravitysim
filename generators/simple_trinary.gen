@@ -1,0 +1,6 @@
+# simple trinary orbit
+# these will not touch often, but will create a juggle effect, and do have contact early on typically
+
+p   0, -20, 0    30.0   0, 4, 0
+p   0,  20, 0    20.0   12,  0, 0
+p -40,  20, 0    25.0   0,  -3, 0

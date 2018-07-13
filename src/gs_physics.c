@@ -70,9 +70,10 @@ void physics_collision_handle() {
                 float force_res;
                 //if true, i is moving towards j, so we are colliding and want to deflect
                 if ((force_res = vec4_dot(diff_p, diff_v)) < 0.0) {
-                    float overlap = i_s + j_s - dist / 2.0;
+                    // we shouldn't need the / 2.0, but it works well
+                    float overlap = (i_s + j_s) - (dist) / 2.0;
 
-                    // second number is beta coefficient, 12.0 is pretty good
+                    // second number is beta coefficient, 250.0 is pretty good for G=1.0, 500.0 is pretty good for G = 10.0
                     // basically:
                     // close to zero, but positive means weak pushback on collisions. They can go through each other
                     // med positive values (like 10.0 - 50.0) make them repel, and can form small clusters
@@ -82,18 +83,20 @@ void physics_collision_handle() {
 
                     // negative values of beta means the particle will get sucked through the one it is colliding with. Sometimes this means they can all get trapped together, but at large values this makes it very chaotic
 
-                    vec4_t penalty = vec4_scale(vec4_normalized(diff_p), GS.coll_B);
+                    // possible modification: don't multiply by fabs(force_res)
+
+                    vec4_t penalty = vec4_scale(vec4_normalized(diff_p), fabs(force_res) * GS.coll_B);
 
                     // these are coefficients based on how close each particle is
-                    float i_prop = overlap / (i_s + 0.25);
+                    float i_prop = overlap / (i_s);
                     //if (i_prop > 1.0f) i_prop = 1.0f;
 
-                    float j_prop = overlap / (j_s + 0.25);
+                    float j_prop = overlap / (j_s);
                     //if (j_prop > 1.0f) j_prop = 1.0f;
 
                     GS.F[i] = vec4_sub(GS.F[i], vec4_scale(penalty, i_prop));
                     GS.F[j] = vec4_add(GS.F[j], vec4_scale(penalty, j_prop));
-                        cols++;
+                    cols++;
                 }
             }
         }
