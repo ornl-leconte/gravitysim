@@ -1,11 +1,16 @@
 cmake_minimum_required (VERSION 2.6)
 
 option(ENABLE_CUDA "enable cuda usage" OFF)
+option(CUDA_COMPILER_WRAPPER "CUDA compiler wrapper (ex: 'macos_nvcc')" OFF)
 
-SET(CMAKE_CUDA_COMPILER ${CMAKE_SOURCE_DIR}/my_nvcc)
+if (CUDA_COMPILER_WRAPPER)
+SET(CMAKE_CUDA_COMPILER ${CUDA_COMPILER_WRAPPER})
+else()
+SET(CMAKE_CUDA_COMPILER nvcc)
+endif()
 
 if (ENABLE_CUDA)
-    project (gravitysim LANGUAGES C CUDA)
+    project (gravitysim LANGUAGES C)# CUDA)
 else()
     project (gravitysim LANGUAGES C)
 endif()

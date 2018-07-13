@@ -157,6 +157,9 @@ void render_init() {
 
     glfwMakeContextCurrent(window);
 
+
+    glfwSwapInterval(0);
+
     glfwGetWindowSize(window, &win_width, &win_height);
     glfwGetFramebufferSize(window, &vp_width, &vp_height);
 

@@ -21,7 +21,8 @@ struct {
 
 void gpu_assert(cudaError_t code, const char *file, int line) {
     if (code != cudaSuccess) {
-        printf("CUDA::ERROR: (at %s:%d) (code %d): %d\n", file, line, code, cudaGetErrorString(code));
+        printf("CUDA::ERROR: (at %s:%d) (code %d): %s\n", file, line, code, cudaGetErrorString(code));
+        exit(1);
     }
 }
 
@@ -96,12 +97,16 @@ int _plnc_hasinit = false;
 void physics_loop_naive_cuda() {
     if (!_plnc_hasinit) {
         // first time initialization code
-        CUDACHK(cudaMalloc((void **)cuda_data.GPU_in_p, n_particles * sizeof(vec4_t)));
-        CUDACHK(cudaMalloc((void **)cuda_data.GPU_g_vel, n_particles * sizeof(vec4_t)));        
-        CUDACHK(cudaMalloc((void **)cuda_data.GPU_out_p, n_particles * sizeof(vec4_t)));        
+        CUDACHK(cudaMalloc((void **)&cuda_data.GPU_in_p, n_particles * sizeof(vec4_t)));
+        CUDACHK(cudaMalloc((void **)&cuda_data.GPU_g_vel, n_particles * sizeof(vec4_t)));        
+        CUDACHK(cudaMalloc((void **)&cuda_data.GPU_out_p, n_particles * sizeof(vec4_t)));        
 
         _plnc_hasinit = true;
     }
+    physics_exts.need_recalc_position = false;
+    physics_exts.need_add_gravity = false;
+    physics_exts.need_clamp = false;
+
 
     CUDACHK(cudaMemcpy(cuda_data.GPU_in_p, particle_data.P, n_particles * sizeof(vec4_t), cudaMemcpyHostToDevice));
     CUDACHK(cudaMemcpy(cuda_data.GPU_g_vel, particle_data.velocities, n_particles * sizeof(vec4_t), cudaMemcpyHostToDevice));
