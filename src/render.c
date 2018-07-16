@@ -52,12 +52,17 @@ struct {
 // struct to sort and apply different qualities/models;
 struct {
 
+    int * sorted_idx;
+
+    vec4_t * sorted_colors;
+
     vec4_t * sorted_particles;
 
-    GLuint vbo;
+    GLuint vbo, col_vbo;
 
     int Q_1_len, Q_2_len, Q_3_len, Q_4_len, Q_5_len, Q_6_len, Q_7_len;
     vec4_t * Q_1, * Q_2, * Q_3, * Q_4, * Q_5, * Q_6, * Q_7;
+    vec4_t * Qc_1, * Qc_2, * Qc_3, * Qc_4, * Qc_5, * Qc_6, * Qc_7;
 
 } render_div;
 
@@ -184,6 +189,7 @@ void render_init() {
 
     // vertex buffer that is reused for each
     glGenBuffers(1, &render_div.vbo);
+    glGenBuffers(1, &render_div.col_vbo);
 
     /* load objects */
 
@@ -228,6 +234,8 @@ void render_init() {
 
     // these are realloc'd each time, because the number of particles might change
     render_div.sorted_particles = NULL;
+    render_div.sorted_colors = NULL;
+    render_div.sorted_idx = NULL;
     render_div.Q_1 = NULL;
     render_div.Q_2 = NULL;
     render_div.Q_3 = NULL;
@@ -235,6 +243,14 @@ void render_init() {
     render_div.Q_5 = NULL;
     render_div.Q_6 = NULL;
     render_div.Q_7 = NULL;
+
+    render_div.Qc_1 = NULL;
+    render_div.Qc_2 = NULL;
+    render_div.Qc_3 = NULL;
+    render_div.Qc_4 = NULL;
+    render_div.Qc_5 = NULL;
+    render_div.Qc_6 = NULL;
+    render_div.Qc_7 = NULL;
 
 
     GLCHK
@@ -303,7 +319,7 @@ void assign_particles_ALLQ2() {
 
 // comparison particles
 int particle_comp(void * _a, void * _b) {
-    vec4_t a = *(vec4_t *)_a, b = *(vec4_t *)_b;
+    vec4_t a = GS.P[*(int *)_a], b = GS.P[*(int *)_b];
     float dx = scene.cam_pos.x - a.x;
     float dy = scene.cam_pos.y - a.y;
     float dz = scene.cam_pos.z - a.z;
@@ -334,37 +350,50 @@ void assign_particles_ORDERED() {
     render_div.Q_6_len = 0;
     render_div.Q_7_len = 0;
 
-
-    memcpy(render_div.sorted_particles, GS.P, sizeof(vec4_t) * GS.N);
-
-    qsort(render_div.sorted_particles, GS.N, sizeof(vec4_t), particle_comp);
-
-
     int i;
+    for (i = 0; i < GS.N; ++i) {
+        render_div.sorted_idx[i] = i;
+    }
+
+    //memcpy(render_div.sorted_particles, GS.P, sizeof(vec4_t) * GS.N);
+
+    qsort(render_div.sorted_idx, GS.N, sizeof(int), particle_comp);
+
+
     for (i = 0; i < GS.N; ++i) {
         // use a really high quality sphere if it's so close
         // but only render 4 of these max
-        vec4_t ca = render_div.sorted_particles[i];
+        vec4_t ca = GS.P[render_div.sorted_idx[i]];
+        vec4_t cc = GS.C[render_div.sorted_idx[i]];
+        render_div.sorted_particles[i] = ca;
+        render_div.sorted_colors[i] = cc;
         if (render_div.Q_7_len < 4 && GS.N <= 1024) {
+            render_div.Qc_7[render_div.Q_7_len] = cc;
             render_div.Q_7[render_div.Q_7_len++] = ca;
         } else if (render_div.Q_6_len < 10 && GS.N <= 2048) {
+            render_div.Qc_6[render_div.Q_6_len] = cc;
             render_div.Q_6[render_div.Q_6_len++] = ca;
         } else if (render_div.Q_5_len < 0.04 * GS.N && GS.N <= 4096) {
+            render_div.Qc_5[render_div.Q_5_len] = cc;
             render_div.Q_5[render_div.Q_5_len++] = ca;
         } else if (render_div.Q_4_len < 0.10 * GS.N && GS.N <= 8196) {
+            render_div.Qc_4[render_div.Q_4_len] = cc;
             render_div.Q_4[render_div.Q_4_len++] = ca;
         } else if (render_div.Q_3_len < 0.25 * GS.N && GS.N <= 16384) {
+            render_div.Qc_3[render_div.Q_3_len] = cc;
             render_div.Q_3[render_div.Q_3_len++] = ca;
         } else if (render_div.Q_3_len < 0.35 * GS.N) {
+            render_div.Qc_2[render_div.Q_2_len] = cc;
             render_div.Q_2[render_div.Q_2_len++] = ca;
         } else {
+            render_div.Qc_1[render_div.Q_1_len] = cc;
             render_div.Q_1[render_div.Q_1_len++] = ca;
         }
     }
     //printf("Q2:%lf,Q3:%lf,Q4:%lf,Q5:%lf,Q6:%lf,Q7:%lf\n", (float)render_div.Q_2_len/GS.N, (float)render_div.Q_3_len/GS.N, (float)render_div.Q_4_len/GS.N, (float)render_div.Q_5_len/GS.N, (float)render_div.Q_6_len/GS.N, (float)render_div.Q_7_len/GS.N);
 }
 
-void _render_particles_pass(model_t cur_Q, vec4_t * _parts, int _parts_len) {
+void _render_particles_pass(model_t cur_Q, vec4_t * _parts, vec4_t * _cols, int _parts_len) {
     if (_parts_len < 1) return;
 
     glBindVertexArray(cur_Q.vao);
@@ -384,6 +413,13 @@ void _render_particles_pass(model_t cur_Q, vec4_t * _parts, int _parts_len) {
     glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glVertexAttribDivisor(2, 1);
 
+
+    glEnableVertexAttribArray(3);
+
+    glBindBuffer(GL_ARRAY_BUFFER, render_div.col_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4_t) * _parts_len, _cols, GL_STREAM_DRAW);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribDivisor(3, 1);
 
     /* instancing */
 
@@ -418,6 +454,8 @@ void render_particles() {
     if (true) {
         // multipass render
         render_div.sorted_particles = (vec4_t *)realloc((void *)render_div.sorted_particles, sizeof(vec4_t) * GS.N);
+        render_div.sorted_idx = (vec4_t *)realloc((void *)render_div.sorted_idx, sizeof(vec4_t) * GS.N);
+        render_div.sorted_colors = (vec4_t *)realloc((void *)render_div.sorted_colors, sizeof(vec4_t) * GS.N);
 
         render_div.Q_1 = (vec4_t *)realloc((void *)render_div.Q_1, sizeof(vec4_t) * GS.N);
         render_div.Q_2 = (vec4_t *)realloc((void *)render_div.Q_2, sizeof(vec4_t) * GS.N);
@@ -427,17 +465,26 @@ void render_particles() {
         render_div.Q_6 = (vec4_t *)realloc((void *)render_div.Q_6, sizeof(vec4_t) * GS.N);
         render_div.Q_7 = (vec4_t *)realloc((void *)render_div.Q_7, sizeof(vec4_t) * GS.N);
 
+        render_div.Qc_1 = (vec4_t *)realloc((void *)render_div.Qc_1, sizeof(vec4_t) * GS.N);
+        render_div.Qc_2 = (vec4_t *)realloc((void *)render_div.Qc_2, sizeof(vec4_t) * GS.N);
+        render_div.Qc_3 = (vec4_t *)realloc((void *)render_div.Qc_3, sizeof(vec4_t) * GS.N);
+        render_div.Qc_4 = (vec4_t *)realloc((void *)render_div.Qc_4, sizeof(vec4_t) * GS.N);
+        render_div.Qc_5 = (vec4_t *)realloc((void *)render_div.Qc_5, sizeof(vec4_t) * GS.N);
+        render_div.Qc_6 = (vec4_t *)realloc((void *)render_div.Qc_6, sizeof(vec4_t) * GS.N);
+        render_div.Qc_7 = (vec4_t *)realloc((void *)render_div.Qc_7, sizeof(vec4_t) * GS.N);
+
+
         assign_particles_ORDERED();
 
-        _render_particles_pass(prefabs.particles.ico.Q_1, render_div.Q_1, render_div.Q_1_len);
-        _render_particles_pass(prefabs.particles.ico.Q_2, render_div.Q_2, render_div.Q_2_len);
-        _render_particles_pass(prefabs.particles.ico.Q_3, render_div.Q_3, render_div.Q_3_len);
-        _render_particles_pass(prefabs.particles.ico.Q_4, render_div.Q_4, render_div.Q_4_len);
-        _render_particles_pass(prefabs.particles.ico.Q_5, render_div.Q_5, render_div.Q_5_len);
-        _render_particles_pass(prefabs.particles.ico.Q_6, render_div.Q_6, render_div.Q_6_len);
-        _render_particles_pass(prefabs.particles.ico.Q_7, render_div.Q_7, render_div.Q_7_len);
+        _render_particles_pass(prefabs.particles.ico.Q_1, render_div.Q_1, render_div.Qc_1, render_div.Q_1_len);
+        _render_particles_pass(prefabs.particles.ico.Q_2, render_div.Q_2, render_div.Qc_2, render_div.Q_2_len);
+        _render_particles_pass(prefabs.particles.ico.Q_3, render_div.Q_3, render_div.Qc_3, render_div.Q_3_len);
+        _render_particles_pass(prefabs.particles.ico.Q_4, render_div.Q_4, render_div.Qc_4, render_div.Q_4_len);
+        _render_particles_pass(prefabs.particles.ico.Q_5, render_div.Q_5, render_div.Qc_5, render_div.Q_5_len);
+        _render_particles_pass(prefabs.particles.ico.Q_6, render_div.Q_6, render_div.Qc_6, render_div.Q_6_len);
+        _render_particles_pass(prefabs.particles.ico.Q_7, render_div.Q_7, render_div.Qc_7, render_div.Q_7_len);
     } else {
-        _render_particles_pass(prefabs.particles.ico.Q_1, GS.P, GS.N);
+        _render_particles_pass(prefabs.particles.ico.Q_1, GS.P, GS.C, GS.N);
         //_render_particles_pass(prefabs.particles.special.blocky, particle_data.P, GS.N);
         //_render_particles_pass(prefabs.particles.special.mememan, particle_data.P, GS.N);
     }

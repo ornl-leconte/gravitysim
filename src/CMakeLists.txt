@@ -19,7 +19,7 @@ MAIN_DEPENDENCY ${CMAKE_SOURCE_DIR}/src/phys/naive_cuda.cu)
     set(extra_libs ${extra_libs} ${CUDA_LIBRARIES} stdc++) 
 endif()
 
-add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c render.c gs_store.c render_vals.c ccgl.c ccgl_gl.c ccgl.h ccgl_gl.h gravitysim.h log.h gs_math.h gs_physics.h gs_store.h render.h render_vals.h controls.h phys/naive.c phys/naive_parallel.c ${extra_files})
+add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c render.c part.c gs_store.c render_vals.c ccgl.c ccgl_gl.c ccgl.h ccgl_gl.h gravitysim.h log.h gs_math.h part.h gs_physics.h gs_store.h render.h render_vals.h controls.h phys/naive.c phys/naive_parallel.c phys/subsec.c ${extra_files})
 
 message(STATUS "cuda build: ${CUDA_LIBRARIES}")
 

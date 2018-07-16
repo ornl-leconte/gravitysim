@@ -8,6 +8,10 @@
 /* math/physics calculations */
 
 
+vec4_t get_nth_color(int n) {
+    return V4(1.0, 0.0, 0.0, 1.0);    
+}
+
 mat4_t perspective(float FOV_rads, float aspect, float Znear, float Zfar) {
 
     float top = Znear * tanf(FOV_rads / 2.0);

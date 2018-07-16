@@ -54,6 +54,8 @@ struct {
     // forces in (kg * meters) / (seconds^2), i.e. in newtons
     vec4_t * F;
 
+    // colors for each
+    vec4_t * C;
 
     // gravitational constant, in units of (meters^3)/(kg*(seconds^2))
     // and for real life, G = 6.67408e-11

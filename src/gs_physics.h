@@ -39,6 +39,8 @@ void physics_clamp_positions();
 void physics_loop_naive();
 void physics_loop_naive_parallel();
 
+void physics_loop_subsec();
+
 
 #ifdef HAVE_OPENCL
 void physics_loop_naive_opencl();

@@ -26,6 +26,7 @@ math routines for gravity sim
         0.0, 0.0, 0.0, 1.0 \
     )
 
+vec4_t get_nth_color(int n);
 
 vec4_t vec4_add(vec4_t a, vec4_t b);
 vec4_t vec4_add_2(vec4_t a, vec4_t b, vec4_t c);

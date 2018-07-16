@@ -24,6 +24,7 @@ void update_N(int N) {
     GS.F = (vec4_t *)realloc(GS.F, sizeof(vec4_t) * N);
     GS.V = (vec4_t *)realloc(GS.V, sizeof(vec4_t) * N);
     GS.P = (vec4_t *)realloc(GS.P, sizeof(vec4_t) * N);
+    GS.C = (vec4_t *)realloc(GS.C, sizeof(vec4_t) * N);
 }
 
 void spawn_particle(vec4_t part, vec4_t vel) {
@@ -43,6 +44,27 @@ void spawn_cluster(vec4_t base, float size, int N) {
         spawn_particle(part, V4(0.0, 0.0, 0.0, 0.0));
     }
 }
+void spawn_uvsphere(vec4_t base, float mass, float _rad, int rings, int sectors, int layers) {
+    int i, j;
+    float R = 1.0 / (rings);
+    float S = 1.0 / (sectors);
+    float rad;
+    int l;
+    for (l = 0; l < layers; ++l) {
+        float rad = _rad * (l + 1) / layers;
+        for (i = 0; i < rings; ++i) {
+            for (j = 0; j < sectors; ++j) {
+                vec4_t cp = base;
+                cp.x = rad * cosf(2 * M_PI * j * S) * sinf(M_PI * i * R);
+                cp.y = rad * sinf(-M_PI_2 + M_PI * i * R);
+                cp.z = rad * sinf(2 * M_PI * j * S) * sinf(M_PI * i * R);
+                cp.w = mass;
+                spawn_particle(cp, V4(0.0, 0.0, 0.0, 0.0));
+            }
+        }
+    }
+}
+
 
 
 
@@ -76,6 +98,16 @@ void run_generator(char * file_path) {
                 spawn_particle(part, V4(0.0, 0.0, 0.0, 0.0));
             } else {
                 printf("ERROR: func 'p': couldn't find any valid argument combinations\n");
+                exit(1);
+            }
+        } else if (strcmp(cur_func, "uvs") == 0) {
+            vec4_t center;
+            int rings, sectors, layers;
+            float mass, rad;
+            if (8 == sscanf(cur_args, "%f,%f,%f %d,%d,%d %f %f\n", &center.x, &center.y, &center.z, &rings, &sectors, &layers, &rad, &mass)) {
+                spawn_uvsphere(center, mass, rad, rings, sectors, layers);
+            } else {
+                printf("ERROR: func 'uvs': couldn't find any valid argument combinations\n");
                 exit(1);
             }
         } else if (strcmp(cur_func, "g") == 0) {
@@ -243,6 +275,11 @@ int main(int argc, char ** argv) {
         glfwInit();
     }
 
+    int i;
+    for (i = 0; i < GS.N; ++i) {
+        GS.C[i] = V4(0.0, 0.0, 1.0, 1.0);
+    }
+
     log_info("all systems initialized");
 
     bool keep_going = true;
@@ -259,6 +296,9 @@ int main(int argc, char ** argv) {
 
         float ph_st = glfwGetTime(), ph_et;
 
+        //for (i = 0; i < GS.N; ++i) {
+        //    GS.C[i] = V4(0.0, (float)fmod(glfwGetTime(), 1.0), 1.0, 1.0);
+        //}
         // these can be hinted at by other implementations that do them more quickly or in one step rather than relying on the gs_physics.c methods to do integrals, etc
         physics_exts.need_recalc_position = true;
         physics_exts.need_collision_handle = true;
@@ -268,12 +308,16 @@ int main(int argc, char ** argv) {
             if (sim_read != NULL) {
                 gs_store_read_frame();
             } else {
-                //physics_loop_naive_cuda();
-                //physics_loop_naive_opencl();            
-                physics_loop_naive();
+          
+                //physics_loop_naive();
                 //physics_loop_naive_parallel();
+                physics_loop_subsec();
 
-                if (physics_exts.need_collision_handle) physics_collision_handle();
+                //physics_loop_naive_cuda();
+
+                //physics_loop_naive_opencl();  
+
+                //if (physics_exts.need_collision_handle) physics_collision_handle();
 
                 // some methods may update position implicitly
                 if (physics_exts.need_recalc_position) physics_update_positions();

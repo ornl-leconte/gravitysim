@@ -3,6 +3,8 @@
 
 #include "gs_math.h"
 
+#include "part.h"
+
 #include <math.h>
 
 #define SOFT_FACTOR 0.25f
@@ -47,61 +49,99 @@ void physics_update_positions() {
     }
 }
 
+
+// collision data
+struct {
+
+    partioning_t partition;
+
+    bool hasinit;
+
+} pch_data = { .hasinit = false };
+
+void _internal_collision(int i, int j) {
+    //if (i == j) return;
+
+    vec4_t i_p = GS.P[i], j_p = GS.P[j];
+
+    float i_s = MASS_TO_SIZE(i_p.w);
+    float j_s = MASS_TO_SIZE(j_p.w);
+
+    float dist = calculate_distance(V4(i_p.x, i_p.y, i_p.z, 0.0), V4(j_p.x, j_p.y, j_p.z, 0.0));
+    if (dist > 0.0 && dist <= i_s + j_s) {
+
+        vec4_t diff_p = vec4_sub(j_p, i_p);
+        diff_p.w = 0.0;
+        vec4_t diff_v = vec4_sub(GS.V[j], GS.V[i]);
+        diff_v.w = 0.0;
+
+        float force_res = vec4_dot(diff_p, diff_v);
+        //if true, i is moving towards j, so we are colliding and want to deflect
+        if (force_res < 0.0) {
+            // we shouldn't need the / 2.0, but it works well
+            float overlap = (i_s + j_s) - dist;
+
+            vec4_t penalty = vec4_scale(vec4_normalized(diff_p), GS.coll_B); //fabs(force_res) * 
+
+            // these are coefficients based on how close each particle is
+            float i_prop = overlap / (i_s);
+            if (i_prop > 1.0f) i_prop = 1.0f;
+
+            float j_prop = overlap / (j_s);
+            if (j_prop > 1.0f) j_prop = 1.0f;
+
+            GS.F[i] = vec4_sub(GS.F[i], vec4_scale(penalty, i_prop));
+            GS.F[j] = vec4_add(GS.F[j], vec4_scale(penalty, j_prop));
+            //cols++;
+        }
+    }
+}
+
 void physics_collision_handle() {
+    
+    if (!pch_data.hasinit) {
+
+        partition_init(&pch_data.partition);
+
+        pch_data.hasinit = true;
+    }
+
+    partition_xgrid(&pch_data.partition, 0.25);
+    //partition_nothing(&pch_data.partition);
+
     int i;
-    int cols = 0;
-
-    for (i = 0; i < GS.N; ++i) {
-        vec4_t i_p = GS.P[i];
-        float i_s = MASS_TO_SIZE(i_p.w);
+    for (i = 0; i < pch_data.partition.sections_len; ++i) {
         int j;
-        for (j = 0; j < i; ++j) {
-            vec4_t j_p = GS.P[j];
-            float j_s = MASS_TO_SIZE(j_p.w);
+        for (j = 0; j < pch_data.partition.sections[i].len; ++j) {
+            // now we should only have to iterate on close sections
+            int a_idx = pch_data.partition.sections[i].idx[j];
 
-            float dist = calculate_distance(V4(i_p.x, i_p.y, i_p.z, 0.0), V4(j_p.x, j_p.y, j_p.z, 0.0));
-            if (dist > 0.0 && dist <= i_s + j_s) {
+            int seek_sec_start = i - 2, seek_sec_end = i;
+            if (seek_sec_start < 0) seek_sec_start = 0;
 
-                vec4_t diff_p = vec4_sub(j_p, i_p);
-                diff_p.w = 0.0;
-                vec4_t diff_v = vec4_sub(GS.V[j], GS.V[i]);
-                diff_v.w = 0.0;
-
-                float force_res;
-                //if true, i is moving towards j, so we are colliding and want to deflect
-                if ((force_res = vec4_dot(diff_p, diff_v)) < 0.0) {
-                    // we shouldn't need the / 2.0, but it works well
-                    float overlap = (i_s + j_s) - (dist) / 2.0;
-
-                    // second number is beta coefficient, 250.0 is pretty good for G=1.0, 500.0 is pretty good for G = 10.0
-                    // basically:
-                    // close to zero, but positive means weak pushback on collisions. They can go through each other
-                    // med positive values (like 10.0 - 50.0) make them repel, and can form small clusters
-                    // large values >>50.0 mean the particles start flying off of each other
-
-                    // at beta = 0.0, no collision detection is really done; objects fly right beside each other or in through each other the same way.
-
-                    // negative values of beta means the particle will get sucked through the one it is colliding with. Sometimes this means they can all get trapped together, but at large values this makes it very chaotic
-
-                    // possible modification: don't multiply by fabs(force_res)
-
-                    vec4_t penalty = vec4_scale(vec4_normalized(diff_p), fabs(force_res) * GS.coll_B);
-
-                    // these are coefficients based on how close each particle is
-                    float i_prop = overlap / (i_s);
-                    //if (i_prop > 1.0f) i_prop = 1.0f;
-
-                    float j_prop = overlap / (j_s);
-                    //if (j_prop > 1.0f) j_prop = 1.0f;
-
-                    GS.F[i] = vec4_sub(GS.F[i], vec4_scale(penalty, i_prop));
-                    GS.F[j] = vec4_add(GS.F[j], vec4_scale(penalty, j_prop));
-                    cols++;
+            int seek_sec;
+            for (seek_sec = seek_sec_start; seek_sec <= seek_sec_end; ++seek_sec) {
+                int k;
+                for (k = 0; k < pch_data.partition.sections[seek_sec].len; ++k) {
+                    int b_idx = pch_data.partition.sections[seek_sec].idx[k];
+                    if (a_idx > b_idx) _internal_collision(a_idx, b_idx);
                 }
             }
         }
     }
-    printf("collisions: %d\n", cols);
+
+/*
+    int i;
+    int cols = 0;
+
+    for (i = 0; i < GS.N; ++i) {
+        int j;
+        for (j = 0; j < i; ++j) {
+            _internal_collision(i, j);
+        }
+    }
+    */
+
 }
 
 float clamp_val(float x, float mn, float mx) {
