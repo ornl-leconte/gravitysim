@@ -14,5 +14,6 @@ void main() {
     gl_Position = uni_viewproj_tr * uni_model_tr * vec4(in_vertex, 1.0);
     frag_pos = vec3(uni_model_tr * vec4(in_vertex, 1.0));
     normal = in_normal;
+    //f_col = v_col;
 }
 

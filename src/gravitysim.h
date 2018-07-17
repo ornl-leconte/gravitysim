@@ -67,7 +67,7 @@ struct {
     float coll_B;
 
     // time step, or delta time this current loop
-    float dt;
+    float ph_dt, total_dt;
 
     // time since starting
     float tt;

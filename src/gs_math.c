@@ -7,9 +7,24 @@
 
 /* math/physics calculations */
 
-
 vec4_t get_nth_color(int n) {
-    return V4(1.0, 0.0, 0.0, 1.0);    
+    float r = 0.5 + 0.5 * sinf(n / 2.0f);
+    float g = fmodf(n / 12.0f, 1.0f);
+    float b = 0.0f;
+    return V4(r, g, b, 1.0);    
+}
+
+vec4_t get_3d_color(float x_prop, float y_prop, float z_prop) {
+    return V4(x_prop, y_prop, z_prop, 1.0f);
+}
+
+vec4_t get_part_color(int x, int xN, int y, int yN, int z, int zN) {
+    vec4_t r;
+    r.x = fmodf(4.0f * x / xN, 1.0f);
+    r.y = 0.5f + 0.5f * sinf(y / 4.54f);
+    r.z = fmodf((float)(z - y) / (zN - yN), 1.0f);
+    r.w = 1.0f;
+    return r;
 }
 
 mat4_t perspective(float FOV_rads, float aspect, float Znear, float Zfar) {

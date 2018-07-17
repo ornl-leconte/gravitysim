@@ -33,7 +33,7 @@ bool is_pressed(int k) {
 
 void control_update() {
     // will be 1.0 at perfect 60.0 fps
-    float cm = GS.dt * 60.0;
+    float cm = GS.total_dt * 60.0;
     glfwSetInputMode(window, GLFW_STICKY_KEYS, 1);
 
     // do update for all sorts of controllers 

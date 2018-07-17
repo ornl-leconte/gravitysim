@@ -44,6 +44,7 @@ void physics_loop_subsec();
 
 #ifdef HAVE_OPENCL
 void physics_loop_naive_opencl();
+void physics_loop_subsec_opencl();
 #endif
 
 

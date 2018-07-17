@@ -122,9 +122,9 @@ void run_generator(char * file_path) {
 
             int nX = (int)floor(num.x+0.5), nY = (int)floor(num.y+0.5), nZ = (int)floor(num.x+0.5);
             float fx, fy, fz;
-            for (fx = start.x; fx < end.x; fx += (end.x - start.x) / nX)
-            for (fy = start.y; fy < end.y; fy += (end.y - start.y) / nY)
-            for (fz = start.z; fz < end.z; fz += (end.z - start.z) / nZ) {
+            for (fx = start.x; fx < end.x + (end.x - start.x) / (nX - 1); fx += (end.x - start.x) / (nX - 1))
+            for (fy = start.y; fy < end.y + (end.y - start.y) / (nY - 1); fy += (end.y - start.y) / (nY - 1))
+            for (fz = start.z; fz < end.z + (end.z - start.z) / (nZ - 1); fz += (end.z - start.z) / (nZ - 1)) {
                 spawn_particle(V4(fx, fy, fz, mass), V4(0.0, 0.0, 0.0, 0.0));
             }
 
@@ -136,6 +136,35 @@ void run_generator(char * file_path) {
         }
     }
 
+}
+
+float _last_physics_time = 0.0f;
+
+void total_physics_loop() {
+
+    physics_exts.need_recalc_position = true;
+    physics_exts.need_collision_handle = true;
+    physics_exts.need_clamp = true;
+
+    //physics_loop_naive();
+    physics_loop_subsec();
+
+    //physics_loop_naive_cuda();
+
+    //physics_loop_naive_opencl();  
+    //physics_loop_subsec_opencl();
+
+    if (physics_exts.need_collision_handle) physics_collision_handle();
+
+    // some methods may update position implicitly
+    if (physics_exts.need_recalc_position) physics_update_positions();
+
+    // keep them in a box
+    if (physics_exts.need_clamp) physics_clamp_positions();
+
+    float ctim = (float)glfwGetTime();
+    GS.ph_dt = ctim - _last_physics_time;
+    _last_physics_time = ctim;
 }
 
 
@@ -153,7 +182,8 @@ int main(int argc, char ** argv) {
     GS.n_frames = 0;
     GS.G = 0.01;
     GS.coll_B = 12.0f;
-    GS.dt = 1.0f / 60.0f;
+    GS.ph_dt = 1.0f / 60.0f;
+    GS.total_dt = 1.0f / 60.0f;
     GS.tt = 0.0f;
     GS.N = 0;
 
@@ -206,7 +236,8 @@ int main(int argc, char ** argv) {
             sscanf(optarg, "%f", &GS.coll_B);
             break;
         case 'L':
-            sscanf(optarg, "%f", &GS.dt);
+            sscanf(optarg, "%f", &GS.ph_dt);
+            sscanf(optarg, "%f", &GS.total_dt);
             break;
         case 'b':
             sscanf(optarg, "%d", &render.buffering);
@@ -284,63 +315,61 @@ int main(int argc, char ** argv) {
 
     bool keep_going = true;
 
+    int physics_overloop = 0;
+
+    _last_physics_time = (float)glfwGetTime();
+
     while (keep_going) {
 
         if (sim_write != NULL) gs_store_write_frame();
         
-        float total_st = glfwGetTime(), total_et;
-
         if (render.show != 0) {
             control_update();
         }
 
-        float ph_st = glfwGetTime(), ph_et;
 
         //for (i = 0; i < GS.N; ++i) {
         //    GS.C[i] = V4(0.0, (float)fmod(glfwGetTime(), 1.0), 1.0, 1.0);
         //}
         // these can be hinted at by other implementations that do them more quickly or in one step rather than relying on the gs_physics.c methods to do integrals, etc
-        physics_exts.need_recalc_position = true;
-        physics_exts.need_collision_handle = true;
-        physics_exts.need_clamp = true;
+
+        float ph_st, ph_et;
+        physics_overloop = 0;
+
+        float total_st = (float)glfwGetTime(), total_et;
 
         if (!GS.is_paused) {
             if (sim_read != NULL) {
+                ph_st = (float)glfwGetTime();
                 gs_store_read_frame();
+                ph_et = (float)glfwGetTime();
             } else {
+                ph_st = (float)glfwGetTime();
           
-                //physics_loop_naive();
-                //physics_loop_naive_parallel();
-                physics_loop_subsec();
+                do {
+                    total_physics_loop();
+                    physics_overloop++;
 
-                //physics_loop_naive_cuda();
+                } while (glfwGetTime() - ph_st <= 0.012f);
 
-                //physics_loop_naive_opencl();  
-
-                //if (physics_exts.need_collision_handle) physics_collision_handle();
-
-                // some methods may update position implicitly
-                if (physics_exts.need_recalc_position) physics_update_positions();
-
-                // keep them in a box
-                if (physics_exts.need_clamp) physics_clamp_positions();
+                ph_et = (float)glfwGetTime();
             }
+        } else {
+            _last_physics_time = (float)glfwGetTime();
         }
-
-        ph_et = glfwGetTime();
 
         if (render.show != 0) {
             keep_going = sim_write != NULL || render_update();
         }
 
-        total_et = glfwGetTime();
+        total_et = (float)glfwGetTime();
 
         if (sim_write == NULL) {
-            GS.dt = total_et - total_st;
+            GS.total_dt = total_et - total_st;
         }
 
         if (log_get_level() >= LOG_DEBUG) {
-            printf("%d: loop time: %3.2f ms, phys time %3.2f ms", GS.n_frames, 1000.0 * (total_et - total_st), 1000.0 * (ph_et - ph_st));
+            printf("%d: loop time: %3.2f ms, phys time %3.2f ms (%d loops)", GS.n_frames, 1000.0 * (total_et - total_st), 1000.0 * (ph_et - ph_st), physics_overloop);
         }
 
         if (log_get_level() >= LOG_TRACE) {

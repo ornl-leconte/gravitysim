@@ -28,6 +28,9 @@ math routines for gravity sim
 
 vec4_t get_nth_color(int n);
 
+vec4_t get_part_color(int x, int xN, int y, int yN, int z, int zN);
+vec4_t get_3d_color(float x_prop, float y_prop, float z_prop);
+
 vec4_t vec4_add(vec4_t a, vec4_t b);
 vec4_t vec4_add_2(vec4_t a, vec4_t b, vec4_t c);
 vec4_t vec4_sub(vec4_t a, vec4_t b);

@@ -8,6 +8,7 @@ subsection method is subsectioning the grid into N parts and then using the aver
 
 #include "gs_physics.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,61 +16,94 @@ subsection method is subsectioning the grid into N parts and then using the aver
 
 #include "part.h"
 
-#define NUM_PARTITIONS (16)
-
-
 
 struct {
 
     bool hasinit;
     
-    partioning_t part;
+    part_3d_t part;
 
-} _pls = { false, NULL };
+} _pls = { false };
 
-
-int subsec_split(const void * _a, const void * _b) {
-    vec4_t a = GS.P[*(int *)_a], b = GS.P[*(int *)_b];
-    return a.x > b.x;
-}
 
 void physics_loop_subsec() {
     if (!_pls.hasinit) {
         // init code
-        partition_init(&_pls.part);
+        part_3d_init(&_pls.part);
 
         _pls.hasinit = true;
     }
 
    // partition_nothing(&_pls.part);
-    partition_xgrid(&_pls.part, 1.0);
+    //partition_xgrid(&_pls.part, 1.0);
+    //part_3d_nothing(&_pls.part);
+    //part_3d_test(&_pls.part);
+    //part_3d_grid(&_pls.part, 10, 10, 10);
+    //part_3d_xprop(&_pls.part, 10);
+    // this works best, 10,10,10 is typically slower
+    
+    if (GS.N >= 2 * 12 * 12 * 12) {
+        part_3d_xyzprop(&_pls.part, 12, 12, 12);
+    } else if (GS.N >= 2 * 8 * 4 * 4) {
+        part_3d_xyzprop(&_pls.part, 8, 4, 4);
+    } else {
+        part_3d_xyzprop(&_pls.part, 1, 1, 1);
+    }
 
     int _;
     for (_ = 0; _ < GS.N; ++_) {
         GS.F[_] = V4(0.0, 0.0, 0.0, 0.0);
     }
 
-    int i_sec;
-    for (i_sec = 0; i_sec < _pls.part.sections_len; ++i_sec) {
-        section_t sec = _pls.part.sections[i_sec];
+
+    int xi, yi, zi;
+    for (xi = 0; xi < _pls.part.Xdim; ++xi)
+    for (yi = 0; yi < _pls.part.Ydim; ++yi)
+    for (zi = 0; zi < _pls.part.Zdim; ++zi) {
+        int node_num = PART3D_IDX(_pls.part, xi, yi, zi);
+        section_t seci = _pls.part.sections[PART3D_IDX(_pls.part, xi, yi, zi)];
+
+        if (seci.len == 0) continue;
 
         int _i;
-        for (_i = 0; _i < sec.len; ++_i) {
-            int i = sec.idx[_i];
+        for (_i = 0; _i < seci.len; ++_i) {
+            int i = seci.idx[_i];
 
-            GS.C[i] = get_nth_color(i_sec);
+            GS.C[i] = get_part_color(xi, _pls.part.Xdim, yi, _pls.part.Ydim, zi, _pls.part.Zdim);
 
-            int _j;
-            for (_j = 0; _j < sec.len; ++_j) {
-                int j = sec.idx[_j];
-                if (i != j) {
-                    // compute forces
-                    GS.F[i] = vec4_add(GS.F[i], calculate_force(GS.P[i], GS.P[j]));
+            int xj, yj, zj;
+
+            int xj_min = xi - 1, yj_min = yi - 1, zj_min = zi - 1;
+            int xj_max = xi + 1, yj_max = yi + 1, zj_max = zi + 1;
+
+            if (xj_min < 0) xj_min = 0;
+            if (yj_min < 0) yj_min = 0;
+            if (zj_min < 0) zj_min = 0;
+
+            if (xj_max >= _pls.part.Xdim) xj_max = _pls.part.Xdim - 1;
+            if (yj_max >= _pls.part.Ydim) yj_max = _pls.part.Ydim - 1;
+            if (zj_max >= _pls.part.Zdim) zj_max = _pls.part.Zdim - 1;
+
+            for (xj = 0; xj < _pls.part.Xdim; ++xj) 
+            for (yj = 0; yj < _pls.part.Ydim; ++yj) 
+            for (zj = 0; zj < _pls.part.Zdim; ++zj) {
+                section_t secj = _pls.part.sections[PART3D_IDX(_pls.part, xj, yj, zj)];
+
+                if (secj.len == 0) continue;
+
+                if (xj >= xj_min && xj <= xj_max && yj >= yj_min && yj <= yj_max && zj >= zj_min && zj <= zj_max) {
+                    int _j;
+                    for (_j = 0; _j < secj.len; ++_j) {
+                        int j = secj.idx[_j];
+
+                        GS.F[i] = vec4_add(GS.F[i], calculate_force(GS.P[i], GS.P[j]));
+                    }
+                } else {
+                    GS.F[i] = vec4_add(GS.F[i], calculate_force(GS.P[i], secj.est));
                 }
             }
         }
     }
-
 }
 
 

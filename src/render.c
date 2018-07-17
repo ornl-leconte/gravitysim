@@ -32,7 +32,7 @@ struct {
 // to store our different instanced stuff
 struct {
 
-    model_t ico, cade, plane;
+    model_t ico, cade, plane, cube, cube_000bl;
 
 
     // spherical-type particles
@@ -212,6 +212,9 @@ void render_init() {
     prefabs.particles.ico.Q_6 = load_obj("models/particle_ico_quality6.obj");
     prefabs.particles.ico.Q_7 = load_obj("models/particle_ico_quality7.obj");
 
+    prefabs.cube = load_obj("models/cube.obj");
+    prefabs.cube_000bl = load_obj("models/cube_000bl.obj");
+
 
     prefabs.particles.special.blocky = load_obj("models/particle_blocky.obj");
     prefabs.particles.special.mememan = load_obj("models/particle_mememan.obj");
@@ -287,19 +290,26 @@ void render_model(model_t model) {
 }
 
 void _floor_render() {
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 
-    glUseProgram(shaders.plane);
+    //glUseProgram(shaders.plane);
+    glUseProgram(shaders.basic);
 
-    int model_tr = glGetUniformLocation(shaders.plane, "uni_model_tr");
-    int viewproj_tr = glGetUniformLocation(shaders.plane, "uni_viewproj_tr");
+    int model_tr = glGetUniformLocation(shaders.basic, "uni_model_tr");
+    int viewproj_tr = glGetUniformLocation(shaders.basic, "uni_viewproj_tr");
+    int col_tr = glGetUniformLocation(shaders.basic, "uni_col");
+    int light_tr = glGetUniformLocation(shaders.basic, "uni_light");
 
-    if (!(model_tr >= 0 && viewproj_tr >= 0)) {
-        printf("error finding transformation shader positions\n");
+    if (!(model_tr >= 0 && viewproj_tr >= 0 && col_tr >= 0)) {
+        printf("error finding transformation shader positions (%d)\n", col_tr);
         exit(1);
     }
 
     glUniformMatrix4fv(model_tr, 1, GL_TRUE, &(scene.floor_model.v[0][0]));
     glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
+    glUniform3f(col_tr, 1.0, 1.0, 0.0);
+    //glUniform3f(light_tr, scene.light_pos.x, scene.light_pos.y, scene.light_pos.z);
+    glUniform3f(light_tr, 0.0f, 50.0f, 0.0f);
 
     render_model(prefabs.plane);
 }
@@ -426,7 +436,50 @@ void _render_particles_pass(model_t cur_Q, vec4_t * _parts, vec4_t * _cols, int 
     glDrawArraysInstanced(GL_TRIANGLES, 0, cur_Q.nbo_num, _parts_len);
 }
 
+void render_boundingbox(vec4_t start, vec4_t end, vec4_t color) {
+    
+   // glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+    glUseProgram(shaders.basic);
+
+    printf("BB\n");
+
+    int model_tr = glGetUniformLocation(shaders.basic, "uni_model_tr");
+    int viewproj_tr = glGetUniformLocation(shaders.basic, "uni_viewproj_tr");
+
+    int col_tr = glGetUniformLocation(shaders.basic, "uni_col");
+    int light_tr = glGetUniformLocation(shaders.basic, "uni_light");
+
+    if (!(model_tr >= 0 && viewproj_tr >= 0 && col_tr >= 0 && light_tr >= 0)) {
+        printf("error finding transformation shader positions (%d,%d)\n", model_tr, viewproj_tr);
+        exit(1);
+    }
+
+    mat4_t model_tm = MAT4_I;
+
+    vec4_t bb_diff = vec4_sub(end, start);
+    //printf("%f,%f,%f\n", bb_diff.x, bb_diff.y, bb_diff.z);
+    
+
+    //model_tm = mat4_mul(mat4_mul(model_tm, translator(1.0, 1.0, 1.0)), scaler(bb_diff.x * 0.5f, bb_diff.y * 0.5f, bb_diff.z * 0.5f));
+    //model_tm = mat4_mul(model_tm, translator(50.0, 0.0, 0.0));
+    model_tm = mat4_mul(model_tm, translator(start.x, start.y, start.z));
+    model_tm = mat4_mul(model_tm, scaler(bb_diff.x, bb_diff.y, bb_diff.z));
+    dump_mat4(model_tm);
+
+    //model_tm = mat4_mul(model_tm, translator(10.0f, 10.0f, 10.0f));
+
+    glUniformMatrix4fv(model_tr, 1, GL_TRUE, &(model_tm.v[0][0]));
+    glUniformMatrix4fv(viewproj_tr, 1, GL_TRUE, &(transformations.viewproj.v[0][0]));
+
+    glUniform3f(col_tr, 1.0, 0.0, 0.0);
+    glUniform3f(light_tr, 1.0, 0.0, 0.0);
+
+    render_model(prefabs.cube_000bl);
+
+}
+
 void render_particles() {
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
     
     glUseProgram(shaders.instanced);
 
@@ -522,6 +575,8 @@ bool render_update() {
     /* draw the stuff */
 
     _floor_render();
+
+    render_boundingbox(V4(0, 0, 0, 0), V4(100, 100, 100, 0.0), V4(0.0, 1.0, 0.0, 0.0));
 
     render_particles();
 

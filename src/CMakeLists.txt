@@ -3,7 +3,7 @@ set(extra_files "")
 set(extra_libs "")
 
 if (OpenCL_FOUND)
-    set(extra_files ${extra_files} phys/naive_opencl.c)
+    set(extra_files ${extra_files} phys/naive_opencl.c phys/subsec_opencl.c)
     set(extra_libs ${extra_libs} ${OpenCL_LIBRARIES})
 endif()
 
