@@ -154,7 +154,7 @@ void total_physics_loop() {
     //physics_loop_naive_opencl();  
     //physics_loop_subsec_opencl();
 
-    if (physics_exts.need_collision_handle) physics_collision_handle();
+    //if (physics_exts.need_collision_handle) physics_collision_handle();
 
     // some methods may update position implicitly
     if (physics_exts.need_recalc_position) physics_update_positions();
@@ -308,7 +308,7 @@ int main(int argc, char ** argv) {
 
     int i;
     for (i = 0; i < GS.N; ++i) {
-        GS.C[i] = V4(0.0, 0.0, 1.0, 1.0);
+        GS.C[i] = V4(1.0, 0.0, 0.25, 1.0);
     }
 
     log_info("all systems initialized");
@@ -350,7 +350,7 @@ int main(int argc, char ** argv) {
                     total_physics_loop();
                     physics_overloop++;
 
-                } while (glfwGetTime() - ph_st <= 0.012f);
+                } while (glfwGetTime() - ph_st <= 0.012f && physics_overloop < 1);
 
                 ph_et = (float)glfwGetTime();
             }

@@ -63,7 +63,7 @@ struct {
 } pch_data = { .hasinit = false };
 
 bool _internal_collision(int i, int j) {
-    if (i == j) return false;
+    if (j >= i) return false;
 
     vec4_t i_p = GS.P[i], j_p = GS.P[j];
 
@@ -74,26 +74,26 @@ bool _internal_collision(int i, int j) {
     if (dist > 0.0 && dist <= i_s + j_s) {
 
         vec4_t diff_p = vec4_sub(j_p, i_p);
-        diff_p.w = 0.0;
+        diff_p.w = 0.0f;
         vec4_t diff_v = vec4_sub(GS.V[j], GS.V[i]);
-        diff_v.w = 0.0;
+        diff_v.w = 0.0f;
 
         float force_res = vec4_dot(diff_p, diff_v);
         //if true, i is moving towards j, so we are colliding and want to deflect
-        if (force_res > 0.0) {
+        if (force_res < 0.0f) {
             // we shouldn't need the / 2.0, but it works well
-            float overlap = (i_s + j_s) - dist;
+            float overlap = (i_s + j_s) - dist * 0.98f;// / 2.0;
 
             vec4_t penalty = vec4_scale(vec4_normalized(diff_p), GS.coll_B); //fabs(force_res) * 
 
             // these are coefficients based on how close each particle is
             float i_prop = overlap / (i_s);
             if (i_prop > 1.0f) i_prop = 1.0f;
-            if (i_prop < 0.1f) i_prop = 0.1f;
+            //if (i_prop < 0.1f) i_prop = 0.1f;
 
             float j_prop = overlap / (j_s);
             if (j_prop > 1.0f) j_prop = 1.0f;
-            if (j_prop < 0.1f) j_prop = 0.1f;
+            //if (j_prop < 0.1f) j_prop = 0.1f;
 
             GS.F[i] = vec4_sub(GS.F[i], vec4_scale(penalty, i_prop));
             GS.F[j] = vec4_add(GS.F[j], vec4_scale(penalty, j_prop));
@@ -157,6 +157,7 @@ void physics_collision_handle() {
             for (zj = zj_min; zj <= zj_max; ++zj) {
 
                 section_t secj = pch_data.part.sections[PART3D_IDX(pch_data.part, xj, yj, zj)];
+
                 if (secj.len == 0) continue;
 
                 int _j;
@@ -168,7 +169,7 @@ void physics_collision_handle() {
             }
         }
     }
-    printf("collisions: %d\n", cols);
+    //printf("collisions: %d\n", cols);
 }
 
 float clamp_val(float x, float mn, float mx) {

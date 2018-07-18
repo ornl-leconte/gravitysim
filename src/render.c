@@ -140,7 +140,7 @@ void render_init() {
     } else {
         // it's important to create a window BEFORE intiailizing glew or anything
         //glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-        window = glfwCreateWindow(640, 480, "gravitysim", NULL, NULL);
+        window = glfwCreateWindow(mode->width, mode->height, "gravitysim", NULL, NULL);
     }
 
     if (window == NULL) {
@@ -576,7 +576,7 @@ bool render_update() {
 
     _floor_render();
 
-    render_boundingbox(V4(0, 0, 0, 0), V4(100, 100, 100, 0.0), V4(0.0, 1.0, 0.0, 0.0));
+//    render_boundingbox(V4(0, 0, 0, 0), V4(100, 100, 100, 0.0), V4(0.0, 1.0, 0.0, 0.0));
 
     render_particles();
 

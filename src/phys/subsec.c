@@ -42,9 +42,11 @@ void physics_loop_subsec() {
     //part_3d_xprop(&_pls.part, 10);
     // this works best, 10,10,10 is typically slower
     
-    if (GS.N >= 2 * 12 * 12 * 12) {
-        part_3d_xyzprop(&_pls.part, 12, 12, 12);
-    } else if (GS.N >= 2 * 8 * 4 * 4) {
+    if (GS.N >= 16 * 16 * 16 * 16) {
+        part_3d_xyzprop(&_pls.part, 16, 16, 16);
+    } else if (GS.N >= 16 * 16 * 8 * 8) {
+        part_3d_xyzprop(&_pls.part, 16, 8, 8);
+    } else if (GS.N >= 16 * 8 * 4 * 4) {
         part_3d_xyzprop(&_pls.part, 8, 4, 4);
     } else {
         part_3d_xyzprop(&_pls.part, 1, 1, 1);

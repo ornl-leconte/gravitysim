@@ -43,8 +43,9 @@ if (ENABLE_CUDA)
     endif()
 endif()
 
-
-set (CMAKE_C_FLAGS "-O3 -ffast-math -g -Wall -pedantic -std=c99 ${CMAKE_C_FLAGS}")
+#optimized
+#-Ofast -ffast-math -finline-functions
+set (CMAKE_C_FLAGS "-Ofast -ffast-math -finline-functions -g -Wall -pedantic -std=c99 ${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 
 
