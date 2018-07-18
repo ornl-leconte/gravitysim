@@ -135,12 +135,18 @@ void render_init() {
         glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
         glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
+        render.framerate = mode->refreshRate;
+
         window = glfwCreateWindow(mode->width, mode->height, "gravitysim", glfwGetPrimaryMonitor(), NULL);
 
     } else {
+        const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+
+        render.framerate = mode->refreshRate;
+
         // it's important to create a window BEFORE intiailizing glew or anything
         //glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-        window = glfwCreateWindow(mode->width, mode->height, "gravitysim", NULL, NULL);
+        window = glfwCreateWindow(render.win_width, render.win_height, "gravitysim", NULL, NULL);
     }
 
     if (window == NULL) {

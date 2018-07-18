@@ -39,6 +39,8 @@ struct {
     // frame buffer length, 0 = no vsync, 1 = vsync, others are extra buffering
     int buffering;
 
+    int framerate;
+
     bool show;
 
 } render;

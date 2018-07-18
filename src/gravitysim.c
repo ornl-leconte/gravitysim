@@ -177,6 +177,7 @@ int main(int argc, char ** argv) {
 
     render.buffering = 1;
     render.show = true;
+    render.framerate = 60;    
 
     GS.is_paused = false;
     GS.n_frames = 0;
@@ -350,7 +351,7 @@ int main(int argc, char ** argv) {
                     total_physics_loop();
                     physics_overloop++;
 
-                } while (glfwGetTime() - ph_st <= 0.012f && physics_overloop < 1);
+                } while (glfwGetTime() - ph_st <= 1.0f / render.framerate - 0.004 /* && physics_overloop < 1 */);
 
                 ph_et = (float)glfwGetTime();
             }
