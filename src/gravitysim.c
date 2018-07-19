@@ -154,7 +154,7 @@ void total_physics_loop() {
     //physics_loop_naive_opencl();  
     //physics_loop_subsec_opencl();
 
-    //if (physics_exts.need_collision_handle) physics_collision_handle();
+    if (physics_exts.need_collision_handle) physics_collision_handle();
 
     // some methods may update position implicitly
     if (physics_exts.need_recalc_position) physics_update_positions();
