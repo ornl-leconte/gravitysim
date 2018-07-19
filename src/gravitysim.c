@@ -276,21 +276,22 @@ int main(int argc, char ** argv) {
 
     if (!render.show) log_warn("no GUI will be displayed, we are using -X");
 
+/*
     if (sim_write != NULL && sim_read != NULL) {
         log_error("Can't specify -I and -O at the same time");
         exit(1);
     }
-
-    if (sim_write != NULL) {
-        log_info("writing output to '%s'", sim_write);
-        gs_store_write_init(sim_write);
-    }
+    */
 
     if (sim_read != NULL) {
         log_info("replaying simulation '%s'", sim_read);
         gs_store_read_init(sim_read);
     }
 
+    if (sim_write != NULL) {
+        log_info("writing output to '%s'", sim_write);
+        gs_store_write_init(sim_write);
+    }
 
     //spawn_cluster(V4(0.0, 0.0, 0.0, 1.0), 100.0, 1024);
 
@@ -321,10 +322,8 @@ int main(int argc, char ** argv) {
     _last_physics_time = (float)glfwGetTime();
 
     while (keep_going) {
-
-        if (sim_write != NULL) gs_store_write_frame();
         
-        if (render.show != 0) {
+        if (render.show) {
             control_update();
         }
 
@@ -342,7 +341,9 @@ int main(int argc, char ** argv) {
         if (!GS.is_paused) {
             if (sim_read != NULL) {
                 ph_st = (float)glfwGetTime();
-                gs_store_read_frame();
+                if (!gs_store_read_frame()) {
+                    sim_read = NULL;
+                }
                 ph_et = (float)glfwGetTime();
             } else {
                 ph_st = (float)glfwGetTime();
@@ -351,7 +352,7 @@ int main(int argc, char ** argv) {
                     total_physics_loop();
                     physics_overloop++;
 
-                } while (glfwGetTime() - ph_st <= 1.0f / render.framerate - 0.004 /* && physics_overloop < 1 */);
+                } while (sim_write == NULL && glfwGetTime() - ph_st <= 1.0f / render.framerate - 0.004 /* && physics_overloop < 1 */);
 
                 ph_et = (float)glfwGetTime();
             }
@@ -359,8 +360,8 @@ int main(int argc, char ** argv) {
             _last_physics_time = (float)glfwGetTime();
         }
 
-        if (render.show != 0) {
-            keep_going = sim_write != NULL || render_update();
+        if (render.show) {
+            keep_going = render_update();
         }
 
         total_et = (float)glfwGetTime();
@@ -381,8 +382,12 @@ int main(int argc, char ** argv) {
         if (log_get_level() >= LOG_DEBUG) {
             printf("\n");
         }
+
+        if (sim_write != NULL) gs_store_write_frame();
+
         //log_trace("total time: %f ms (%f fps)", (et - st) / 1000.0, 1.0 / (et - st));
         GS.n_frames++;
+
     }
 
 
