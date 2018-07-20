@@ -156,7 +156,7 @@ void physics_loop_subsec_opencl() {
         CLCHK_NOSET(cl_data.out_C = clCreateBuffer(cl_env.context, CL_MEM_WRITE_ONLY, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
         CLCHK_NOSET(cl_data.out_P = clCreateBuffer(cl_env.context, CL_MEM_WRITE_ONLY, sizeof(vec4_t) * cl_data._N, NULL, &cl_env.err));
 
-        cl_data._nX = 8;
+        cl_data._nX = 4;
         cl_data._nY = 4;
         cl_data._nZ = 4;
 
@@ -223,7 +223,7 @@ void physics_loop_subsec_opencl() {
 
     CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.subsec_data, CL_TRUE, 0, sizeof(int) * GS.N, plso_data.packed_subsec_data, 0, NULL, NULL));
 
-    CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.subsec_est, CL_TRUE, 0, sizeof(vec4_t) * plso_data.part.Xdim * plso_data.part.Ydim * plso_data.part.Zdim, plso_data.packed_subsec_est, 0, NULL, NULL));
+    CLCHK(clEnqueueWriteBuffer(cl_env.queue, cl_data.subsec_est, CL_TRUE, 0, sizeof(vec4_t) * cl_data._nX * cl_data._nY * cl_data._nZ, plso_data.packed_subsec_est, 0, NULL, NULL));
 
 
     // this means we have to
@@ -256,7 +256,7 @@ void physics_loop_subsec_opencl() {
     CLCHK(clSetKernelArg(cl_env.kernel, 12, sizeof(cl_mem), &cl_data.subsec_est));
 
 
-    size_t local_size = 16;
+    size_t local_size = 8;
     size_t global_size = (cl_N / local_size + ((cl_N % local_size) != 0)) * local_size;
 
     //float st = (float)glfwGetTime(), et;

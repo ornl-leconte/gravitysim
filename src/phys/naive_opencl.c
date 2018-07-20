@@ -165,7 +165,7 @@ void physics_loop_naive_opencl() {
     CLCHK(clSetKernelArg(cl_env.kernel, 5, sizeof(cl_mem), &cl_data.out_P));
 
 
-    size_t local_size = 16;
+    size_t local_size = 4;
     size_t global_size = (cl_N / local_size + ((cl_N % local_size) != 0)) * local_size;
 
     //float st = (float)glfwGetTime(), et;

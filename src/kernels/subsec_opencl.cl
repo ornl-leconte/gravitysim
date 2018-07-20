@@ -4,6 +4,15 @@
 
 #define PART3D_IDX(nx, ny, nz, x, y, z) ((x) + (nx) * (y) + (nx) * (ny) * (z))
 
+float4 get_color(int nx, int ny, int nz, int xi, int yi, int zi) {
+  float r = 0.0f, g = 0.0f, b = 0.0f;
+  if (xi * 2 <= nx) {
+    r = 0.8f;
+  } else {
+    g = 0.8f;
+  }
+  return (float4){ r, g, b, 1.0f };
+}
 
 // this is so that radius is proportionally related to volume (all balls should have constant density)
 float mass_to_size(float mass) {
@@ -58,17 +67,22 @@ __kernel void compute_system_subsec(int N, float dt, float G, __global float4 * 
   int cur_subsec = -1;
   int l;
   for (l = 0; l < nX * nY * nZ && cur_subsec == -1; ++l) {
-    if (i > subsec_offsets[l]) {
+    if (i == subsec_data[l]) {
       cur_subsec = l;
       break;
     }
   }
+  //if (cur_subsec < 0) {
+  //  return;
+   // printf("error\n");
+  //}
 
-//(p, x, y, z) ((x) + p.Xdim * (y) + p.Xdim * p.Ydim * (z))
+//(p, x, y, z) ((x) + nX * (y) + nX * nY * (z))
   int xi, yi, zi;
-  zi = l / (nX * nY);
-  yi = (l / nX) % nY;
   xi = l % nX;
+  yi = (l / nX) % nY;
+  zi = l / (nX * nY);
+  out_C[i] = get_color(nX, nY, nZ, xi, yi, zi);
 
   int x_min = xi - 1, x_max = xi + 1;
   int y_min = yi - 1, y_max = yi + 1;
@@ -112,6 +126,6 @@ __kernel void compute_system_subsec(int N, float dt, float G, __global float4 * 
   out_P[i] = P;
   //out_P[i] =(float4)(1.0f, 0.0f, 0.0f, 1.0f);
   g_V[i] = V;
-  out_C[i] = (float4)(1.0f, 0.0f, 0.0f, 1.0f);
+  //out_C[i] = (float4)(1.0f,0.5f, 0.0f, 1.0f);
 }
 
