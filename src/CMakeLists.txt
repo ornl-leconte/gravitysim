@@ -23,7 +23,7 @@ add_executable(gravitysim gravitysim.c log.c gs_math.c controls.c gs_physics.c r
 
 message(STATUS "cuda build: ${CUDA_LIBRARIES}")
 
-target_link_libraries(gravitysim m ${CMAKE_DL_LIBS} ${GLEW_LIBRARIES} glfw pthread ${OPENGL_LIBRARIES} glew ${extra_libs})
+target_link_libraries(gravitysim m ${CMAKE_DL_LIBS} ${GLEW_LIBRARIES} glfw pthread ${OPENGL_LIBRARIES} ${extra_libs})
 
 
 install (FILES gravitysim.h DESTINATION include)
